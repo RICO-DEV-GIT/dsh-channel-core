@@ -12,7 +12,8 @@ test('the Feishu page is one panel with a list of bots and no name-card QR', () 
   assert(!source.includes('function FeishuBotCard'), 'the old separate card is gone');
   assert(!source.includes('function FeishuRegistrationCard'), 'the old separate registration card is gone');
   assert(source.includes('e(FeishuBotPanel,{scope:rootScope,credentialApi})'), 'only the Feishu tab renders it, once');
-  assert(source.includes("head('飞书机器人'"), 'one page title, in every state');
+  // No header at all: the tab name already says "飞书", so a title was noise.
+  assert(!source.includes('飞书机器人'), 'no panel title is rendered');
   // The name-card QR was removed on purpose: no QR appears unless a bot is added.
   assert(!source.includes("scope.call('botCard'"), 'the name-card QR is no longer fetched');
   assert(!source.includes('复制链接'), 'the name-card link block is gone');
