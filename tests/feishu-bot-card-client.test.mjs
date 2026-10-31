@@ -92,6 +92,16 @@ test('the bot list offers only add and delete', () => {
   assert(!source.includes("row.appId?null:e('button'"), 'no row-level add-bot button remains');
 });
 
+test('the panel loads its own snapshot', () => {
+  // It used to rely on the settings form to trigger the first load; that form is
+  // hidden when no bot is selected, so deleting the last bot left the page on
+  // "正在读取渠道设置…" forever.
+  assert(source.includes('// The panel owns its first load'), 'the panel documents and performs the first load');
+  const panel = source.slice(source.indexOf('function FeishuBotPanel'), source.indexOf('function AgentPresetHint'));
+  assert(panel.includes('scope.reload()'), 'the panel calls reload itself');
+  assert(!panel.includes('if(scope===rootScope)return undefined'), 'the load is not skipped for the default scope');
+});
+
 test('the server enforces the hard constraints', () => {
   // These rules live in the RPC layer; read the source because instantiating the
   // service needs the whole Host.

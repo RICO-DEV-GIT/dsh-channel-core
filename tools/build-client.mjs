@@ -75,9 +75,11 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     const selected=useSelectedAccount();
     const scope=React.useMemo(()=>selected?createAccountScope(rootScope,selected):rootScope,[rootScope,selected]);
     React.useEffect(()=>{
-      if(scope===rootScope)return undefined;
+      // The panel owns its first load. It used to rely on the settings form below
+      // doing it, but that form is hidden when no bot is selected — which left the
+      // page on "正在读取渠道设置…" forever once the last bot was deleted.
       void scope.reload().catch(()=>{});
-      return ()=>scope.close();
+      return scope===rootScope?undefined:()=>scope.close();
     },[scope,rootScope]);
     const snapshot=useFileConfig(scope);
     const config=snapshot?.value??{};
