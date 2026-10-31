@@ -29,7 +29,7 @@ if(adapt.discord.fields.length<5||adapt.feishu.fields.length<5)throw Error('miss
 const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
   const bundledConfigCss=${JSON.stringify(css)};
   const botCss='.dcb-bot{margin:0 0 22px;padding:18px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-2)}.dcb-bot-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}.dcb-bot-head h3{margin:0 0 6px;font-size:15px}.dcb-bot-head p{margin:0;max-width:44em;font-size:13px;line-height:1.6;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-bot-btn,.dcb-bot-copy{padding:7px 14px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:inherit;cursor:pointer;font-size:13px}.dcb-bot-btn:disabled{opacity:.6;cursor:default}.dcb-bot-body{display:flex;gap:18px;align-items:center;margin-top:16px;flex-wrap:wrap}.dcb-bot-body img{border-radius:8px;background:#fff;flex:0 0 auto}.dcb-bot-meta{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1 1 220px}.dcb-bot-link{font-size:12px;word-break:break-all;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-bot-msg{margin:12px 0 0;font-size:13px;color:var(--dsw-alias-label-secondary,#8a8f99)}';
-  const regCss='.dcb-reg{margin:0 0 22px;padding:18px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-2)}.dcb-reg-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}.dcb-reg-head h3{margin:0 0 6px;font-size:15px}.dcb-reg-head p{margin:0;max-width:44em;font-size:13px;line-height:1.6;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-reg-body{display:flex;gap:18px;align-items:center;margin-top:16px;flex-wrap:wrap}.dcb-reg-body img{border-radius:8px;background:#fff;flex:0 0 auto}.dcb-reg-msg{margin:12px 0 0;font-size:13px;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-reg-err{color:var(--dsw-alias-state-error-primary,#d64545)}.dcb-preset{margin:0 0 16px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-2);font-size:12px;line-height:1.7;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-preset code{color:inherit;font-size:12px}.dcb-preset-warn{border-color:var(--dsw-alias-state-error-primary,#d64545);color:var(--dsw-alias-state-error-primary,#d64545)}.dcb-bot-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}.dcb-checklist{margin-top:14px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l2);font-size:12px;line-height:1.8;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-checklist-head{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.dcb-checklist ol{margin:8px 0 0;padding-left:20px}.dcb-checklist li{margin:4px 0}';
+  const regCss='.dcb-reg{margin:0 0 22px;padding:18px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-2)}.dcb-reg-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}.dcb-reg-head h3{margin:0 0 6px;font-size:15px}.dcb-reg-head p{margin:0;max-width:44em;font-size:13px;line-height:1.6;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-reg-body{display:flex;gap:18px;align-items:center;margin-top:16px;flex-wrap:wrap}.dcb-reg-body img{border-radius:8px;background:#fff;flex:0 0 auto}.dcb-reg-msg{margin:12px 0 0;font-size:13px;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-reg-err{color:var(--dsw-alias-state-error-primary,#d64545)}.dcb-preset{margin:0 0 16px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-2);font-size:12px;line-height:1.7;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-preset code{color:inherit;font-size:12px}.dcb-preset-warn{border-color:var(--dsw-alias-state-error-primary,#d64545);color:var(--dsw-alias-state-error-primary,#d64545)}.dcb-bot-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}.dcb-checklist{margin-top:14px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l2);font-size:12px;line-height:1.8;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-checklist-head{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.dcb-checklist ol{margin:8px 0 0;padding-left:20px}.dcb-checklist li{margin:4px 0}.dcb-health{margin:0 0 14px;padding:12px 14px;border:1px solid var(--dsw-alias-state-error-primary,#d64545);border-radius:10px;background:var(--dsw-alias-bg-layer-2);font-size:12px;line-height:1.9;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-health strong{display:block;margin-bottom:4px;color:var(--dsw-alias-label-primary,#1f2329);font-size:13px}.dcb-health ul{margin:0;padding:0;list-style:none;display:grid;gap:6px}.dcb-health li{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.dcb-health .dcb-ok{opacity:.75}.dcb-health-form{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}.dcb-health-form input{box-sizing:border-box;min-width:180px;padding:6px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:inherit;font:inherit}';
   // One entry for the whole Feishu bot lifecycle: scan to create/connect,
   // paste existing credentials, then — once connected — scan to open the chat.
   // Two cards made the operator guess which QR to press; the state now decides.
@@ -79,6 +79,51 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     const copy=async()=>{
       try{await navigator.clipboard.writeText(card.link);setNotice('链接已复制');}
       catch{setNotice('复制失败，请手动选中链接复制');}
+    };
+    // First-run health: the three things that make a scan useless when missing
+    // (switch off, credentials absent, no workspace). Each failing row offers
+    // the fix in place instead of waiting for a failure message later.
+    const [credentialReady,setCredentialReady]=React.useState(null);
+    const [workspaceDraft,setWorkspaceDraft]=React.useState('');
+    React.useEffect(()=>{
+      let alive=true;
+      if(!credentialApi){setCredentialReady(null);return undefined;}
+      credentialApi.describe([secretRef]).then(result=>{
+        if(!alive)return;
+        setCredentialReady(result&&result.ok?(result.value&&result.value[secretRef]&&result.value[secretRef].configured===true):null);
+      }).catch(()=>{if(alive)setCredentialReady(null);});
+      return ()=>{alive=false;};
+    },[credentialApi,secretRef]);
+    const workspaceValue=String(config.workspacePath||'').trim()||String((snapshot?.details??{}).workspacePath||'').trim();
+    const health=[
+      {key:'enabled',ok:config.enabled===true,label:'已开启「连接渠道」'},
+      {key:'credential',ok:!!appId&&credentialReady===true,label:'App ID 与密钥已就绪'},
+      {key:'workspace',ok:!!workspaceValue,label:'已指定工作区目录'},
+    ];
+    const enableChannel=async()=>{
+      try{const fresh=await scope.reload();await scope.update({...fresh.value,enabled:true},fresh.revision);await scope.reload();setNotice('已开启连接渠道');}
+      catch(error){setNotice('开启失败：'+error.message);}
+    };
+    const saveWorkspace=async()=>{
+      const value=workspaceDraft.trim();
+      if(!value){setNotice('请填写工作区路径，例如 G:\\DSWork');return;}
+      try{const fresh=await scope.reload();await scope.update({...fresh.value,workspacePath:value},fresh.revision);await scope.reload();setNotice('已保存工作区：'+value);}
+      catch(error){setNotice('保存失败：'+error.message);}
+    };
+    const healthBlock=()=>{
+      if(!health.some(row=>!row.ok))return null;
+      return e('div',{className:'dcb-health'},
+        e('strong',null,'首次使用还差这几项'),
+        e('ul',null,health.map(row=>e('li',{key:row.key,className:row.ok?'dcb-ok':'dcb-todo'},
+          e('span',null,(row.ok?'✅ ':'⚠️ ')+row.label),
+          row.ok?null:(row.key==='enabled'
+            ?e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void enableChannel();}},'打开连接渠道')
+            :row.key==='credential'
+              ?e('button',{type:'button',className:'dcb-bot-copy',onClick:begin},'扫码配置凭证')
+              :e('span',{className:'dcb-health-form'},
+                e('input',{type:'text',value:workspaceDraft,placeholder:'例如 G:\\DSWork','aria-label':'工作区路径',
+                  onChange:event=>setWorkspaceDraft(event.target.value)}),
+                e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void saveWorkspace();}},'保存工作区')))))));
     };
     const poll=async deviceCode=>{
       let result;
@@ -203,6 +248,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     if(!connected){
       return e('section',{className:'dcb-bot'},
         head('连接飞书机器人','用手机飞书扫描下面的二维码：在手机上选择「新建机器人」会自动创建并写入凭证，选择「已有机器人」会直接拉取该应用的 App ID 与密钥。全程不用手填，也不用先去开发者后台重置凭证。'),
+        healthBlock(),
         scanBlock(),
         noticeLine(),
         checklistBlock());
@@ -223,6 +269,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
             e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void fetchCard();}},'重新生成二维码'))),
       // Still available when connected: scanning again is how a different bot is
       // added or switched to, chosen entirely on the phone.
+      healthBlock(),
       scanBlock(),
       noticeLine(),
       checklistBlock());

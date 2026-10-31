@@ -149,6 +149,7 @@ test('applying a fresh bot config claims the operator as owner', () => {
   assert.equal(next.ownerMode, 'manual');
   assert.equal(next.ownerUserId, 'ou_0123456789abcdef');
   assert.deepEqual(next.allowedUsers, []);
+  assert.equal(next.enabled, true, 'a completed scan turns the channel on instead of leaving it off');
 });
 
 test('applying to a configured bot only appends the operator to the allowlist', () => {
