@@ -86,6 +86,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     const [credentialReady,setCredentialReady]=React.useState(null);
     const [workspaceDraft,setWorkspaceDraft]=React.useState('');
     const [manualPath,setManualPath]=React.useState(false);
+    const [missingPath,setMissingPath]=React.useState('');
     React.useEffect(()=>{
       let alive=true;
       if(!credentialApi){setCredentialReady(null);return undefined;}
@@ -106,12 +107,27 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       catch(error){setNotice('开启失败：'+error.message);}
     };
     const saveWorkspacePath=async value=>{
-      try{const fresh=await scope.reload();await scope.update({...fresh.value,workspacePath:value},fresh.revision);await scope.reload();setNotice('已保存工作区：'+value);}
+      try{const fresh=await scope.reload();await scope.update({...fresh.value,workspacePath:value},fresh.revision);await scope.reload();setNotice('已保存工作区：'+value);setMissingPath('');}
       catch(error){setNotice('保存失败：'+error.message);}
     };
+    // A typed path is checked before it is stored: a typo used to surface only
+    // when the first message failed. A missing directory is offered for creation
+    // instead of being saved silently.
     const saveWorkspace=async()=>{
       const value=workspaceDraft.trim();
       if(!value){setNotice('请填写工作区路径，例如 G:\\DSWork');return;}
+      let status;
+      try{status=await scope.call('directoryCheck',{path:value});}
+      catch(error){setNotice('无法检查该路径：'+error.message);return;}
+      if(status&&status.exists&&status.isDirectory===false){setNotice('该路径是文件，不是目录：'+value);return;}
+      if(!status||status.exists!==true){setMissingPath(value);setNotice('目录不存在：'+value);return;}
+      await saveWorkspacePath(value);
+    };
+    const createWorkspace=async()=>{
+      const value=missingPath;
+      if(!value)return;
+      try{await scope.call('directoryCreate',{path:value});}
+      catch(error){setNotice('创建失败：'+error.message);return;}
       await saveWorkspacePath(value);
     };
     // Native directory picker: the desktop bridge opens the OS dialog, which also
@@ -145,7 +161,11 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
                 manualPath?e(React.Fragment,null,
                   e('input',{type:'text',value:workspaceDraft,placeholder:'例如 G:\\DSWork','aria-label':'工作区路径',
                     onChange:event=>setWorkspaceDraft(event.target.value)}),
-                  e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void saveWorkspace();}},'保存')):null))))));
+                  e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void saveWorkspace();}},'保存'),
+                  missingPath?e(React.Fragment,null,
+                    e('span',{className:'dcb-reg-err'},'目录不存在'),
+                    e('button',{type:'button',className:'dcb-bot-btn',onClick:()=>{void createWorkspace();}},'创建并保存'),
+                    e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{setMissingPath('');setNotice('');}},'取消')):null):null))))));
     };
     const poll=async deviceCode=>{
       let result;
