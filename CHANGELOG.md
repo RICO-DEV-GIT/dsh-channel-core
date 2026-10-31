@@ -2,7 +2,7 @@
 
 This file holds historical behavior notes formerly embedded in README. For current setup and behavior, start with [README.md](README.md) or [简体中文](README.zh-CN.md).
 
-## 未发布 · 模型切换卡片
+## 0.9.0-dev · 模型切换卡片
 
 - `/model`（不带参数）在飞书里改为发送一张**选择卡片**：提供方下拉 + 该提供方的模型下拉 + 「切换」按钮，并支持分页。手机上一个 profile 可能有上百个模型，纯文本列表既读不完也记不住；卡片里点选即可，切换后同一张卡片就地更新为「已切换 …，下一次请求生效」。
 - 只列出可对话的模型：`embedding / seedream / seedance / tts / vision` 等按名字过滤（某提供方若全部被过滤则原样保留，避免列表变空）。
