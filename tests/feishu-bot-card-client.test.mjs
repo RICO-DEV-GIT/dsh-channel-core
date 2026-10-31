@@ -81,7 +81,9 @@ test('the console checklist only appears when it can help', () => {
 
 test('the bot list offers only add and delete', () => {
   assert(source.includes('dcb-accounts'), 'the bot list renders');
-  assert(source.includes('+ 添加机器人'), 'one button adds a bot');
+  assert(source.includes('快捷配置'), 'quick add is a first-class button');
+  assert(source.includes('手动配置'), 'manual add is a first-class button');
+  assert(!source.includes('+ 添加机器人'), 'no intermediate add step remains');
   assert(source.includes(",'删除'"), 'each bot can be deleted');
   assert(source.includes('确认删除'), 'deletion needs a second click');
   assert(!source.includes('至少保留一个机器人'), 'every bot can be deleted, including the last');
