@@ -7,6 +7,15 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = fs.readFileSync(path.join(root, 'lib/client.js'), 'utf8');
 
+test('the quick scan reads the fields the Host actually returns', () => {
+  // begin() answers {deviceCode, qrPng, expireSeconds, intervalSeconds}; reading a
+  // plain qr field made the page report "未返回二维码" on a working scan.
+  assert(source.includes('begun?.qrPng'), 'the PNG field is qrPng');
+  assert(source.includes('begun?.expireSeconds'), 'the lifetime field is expireSeconds');
+  assert(source.includes('begun?.intervalSeconds'), 'the cadence field is intervalSeconds');
+  assert(!source.includes('begun?.expiresIn'), 'the invented expiresIn field is gone');
+});
+
 test('the merged bot panel keeps the scan-to-create/connect flow', () => {
   assert(source.includes('function FeishuBotPanel'), 'the panel is bundled');
   assert(source.includes("scope.call('registrationBegin'"), 'begin is fetched through the channel settings service');
