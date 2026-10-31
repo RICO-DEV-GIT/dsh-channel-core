@@ -596,14 +596,22 @@ export async function createTransport({config,credentials,signal,receive,state,d
       }
       if(body.feishuModelCard){
         const card=body.feishuModelCard.card;
-        if(!card||card.schema!=='2.0'||!withinBudget(card))throw new Error('feishu-model-card-invalid');
-        const sent=await channel.send(origin.conversationId,{card},sendOptions(origin));
-        // Remember which Session this card edits; a tap can arrive minutes later.
-        if(sent?.messageId){
-          modelCards.set(sent.messageId,{sessionId:body.feishuModelCard.sessionId});
-          if(modelCards.size>32)modelCards.delete(modelCards.keys().next().value);
+        // A card that Feishu rejects must never take the whole reply down: the
+        // text answer is right here, so fall back to it and say what happened.
+        try{
+          if(!card||card.schema!=='2.0'||!withinBudget(card))throw new Error('feishu-model-card-invalid');
+          const sent=await channel.send(origin.conversationId,{card},sendOptions(origin));
+          // Remember which Session this card edits; a tap can arrive minutes later.
+          if(sent?.messageId){
+            modelCards.set(sent.messageId,{sessionId:body.feishuModelCard.sessionId});
+            if(modelCards.size>32)modelCards.delete(modelCards.keys().next().value);
+          }
+          return sent;
+        }catch(error){
+          cardNotice('模型选择卡片发送失败，已改用文本：'+(error?.code??error?.status??error?.message??'unknown'),error?.code);
+          const fallback=String(body.text??'').trim();
+          return channel.send(origin.conversationId,{text:fallback||'模型卡片暂不可用，请稍后重试。'},sendOptions(origin));
         }
-        return sent;
       }
       // `auto` means: a private chat is read on a phone, so deliver the answer as
       // a message the reader can select and copy; a group keeps the card.

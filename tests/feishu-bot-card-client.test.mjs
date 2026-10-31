@@ -69,6 +69,14 @@ test('the workspace uses the native directory picker with a manual fallback', ()
   assert(source.includes("'手动填写'"), 'typing stays available behind a toggle');
 });
 
+test('the workspace can be changed at any time, not only when it is missing', () => {
+  // The health block disappears after all three checks pass, which used to remove
+  // the only way to pick a different directory.
+  assert(source.includes('更换目录…'), 'a replace action is offered when a workspace exists');
+  assert(source.includes('dcb-workspace'), 'the line renders outside the health block');
+  assert.equal((source.match(/workspaceLine\(\)/g) ?? []).length, 2, 'both connected states render it');
+});
+
 test('the console checklist only appears when it can help', () => {
   assert(source.includes('const needsHelp=!connected'), 'visibility is derived from channel state');
 });
