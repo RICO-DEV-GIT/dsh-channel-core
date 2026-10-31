@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accountOwningBot, credentialRefFor, addAccount, removeAccount } from '../lib/accounts.js';
+import { accountOwningBot, credentialRefFor, addAccount, removeAccount, resolveWorkspaceBase, joinWorkspace } from '../lib/accounts.js';
 import { assertWorkspaceDisjoint, workspaceOverlap } from '../lib/workspace-scope.js';
 
 const base = () => ({
@@ -26,20 +26,28 @@ test('the credential name for a new bot is derived from its account id', () => {
   assert.equal(credentialRefFor('work-2'), 'FEISHU_APP_SECRET_WORK_2');
 });
 
-test('the workspace rules hold for every door: create, bind, save', () => {
-  // create: addAccount refuses an overlapping or empty path
-  const withTwo = base();
-  assert.throws(() => addAccount(withTwo, { workspacePath: 'G:\\A\\inner' }), /重叠/);
-  assert.throws(() => addAccount(withTwo, { workspacePath: '' }), /请先为该账号选择工作区/);
-  // bind/save: the same pure check the RPC layer now calls before writing
-  const saved = { ...withTwo.accounts, 'bot-2': { ...withTwo.accounts['bot-2'], workspacePath: 'g:\\a' } };
-  assert.equal(assertWorkspaceDisjoint(saved, 'bot-2').ok, false);
-  assert.equal(assertWorkspaceDisjoint(saved, 'bot-2').code, 'workspace-overlap');
-  // a sibling with no workspace blocks the others (never allowed once there are two)
-  const empty = { ...withTwo.accounts, 'bot-2': { ...withTwo.accounts['bot-2'], workspacePath: '' } };
-  assert.equal(assertWorkspaceDisjoint(empty, 'bot-1').code, 'workspace-required');
-  // siblings are fine
-  assert.equal(assertWorkspaceDisjoint(base().accounts, 'bot-1').ok, true);
+test('the workspace is derived from the App ID, never typed', () => {
+  // The only door left: the path is computed, so two bots cannot collide unless the
+  // App ID itself is reused (which C4 already refuses).
+  const withBot = addAccount(base(), { appId: 'cli_new_bot' });
+  assert.equal(withBot.workspacePath, joinWorkspace('G:\\DSWork', 'cli_new_bot'));
+  assert.equal(withBot.value.accounts[withBot.accountId].workspacePath, withBot.workspacePath);
+  assert.throws(() => addAccount(base(), {}), /工作区由 App ID 决定/);
+  // An identical path is still refused (defence in depth for a hand-edited file).
+  const clashing = { ...base().accounts, 'bot-2': { ...base().accounts['bot-2'], workspacePath: 'g:\\a' } };
+  assert.equal(assertWorkspaceDisjoint(clashing, 'bot-2').code, 'workspace-overlap');
+  // Nesting is allowed: every bot lives under the same root by design.
+  assert.equal(assertWorkspaceDisjoint({ 'bot-1': { workspacePath: 'G:\\DSWork' }, 'bot-2': { workspacePath: 'G:\\DSWork\\cli_x' } }, 'bot-2').ok, true);
+});
+
+test('the workspace root falls back when G:\DSWork is missing', async () => {
+  const present = await resolveWorkspaceBase({ fallback: 'C:\\plugin', exists: async () => true });
+  assert.equal(present, 'G:\\DSWork');
+  const missing = await resolveWorkspaceBase({ fallback: 'C:\\plugin', exists: async () => false });
+  assert.equal(missing, 'C:\\plugin');
+  // The fallback itself is used even when it is the only candidate that exists.
+  const only = await resolveWorkspaceBase({ fallback: 'C:\\plugin', exists: async candidate => candidate === 'C:\\plugin' });
+  assert.equal(only, 'C:\\plugin');
 });
 
 test('deleting a bot keeps its sibling intact', () => {

@@ -45,10 +45,16 @@ test('with siblings an empty workspace is refused and named', () => {
   assert.deepEqual(assertWorkspaceDisjoint(inner, 'default'), { ok: false, code: 'workspace-required', conflict: 'second' });
 });
 
-test('overlapping siblings are refused with the conflicting account id', () => {
-  const accounts = { default: { workspacePath: LEFT }, second: { workspacePath: INSIDE } };
-  assert.deepEqual(assertWorkspaceDisjoint(accounts, 'default'), { ok: false, code: 'workspace-overlap', conflict: 'second' });
-  assert.deepEqual(assertWorkspaceDisjoint(accounts, 'second'), { ok: false, code: 'workspace-overlap', conflict: 'default' });
+test('only an identical workspace is refused, and the conflict is named', () => {
+  const same = { default: { workspacePath: LEFT }, second: { workspacePath: LEFT } };
+  assert.deepEqual(assertWorkspaceDisjoint(same, 'default'), { ok: false, code: 'workspace-overlap', conflict: 'second' });
+  assert.deepEqual(assertWorkspaceDisjoint(same, 'second'), { ok: false, code: 'workspace-overlap', conflict: 'default' });
+});
+
+test('nested workspaces are allowed: every bot lives under one root', () => {
+  const nested = { default: { workspacePath: LEFT }, second: { workspacePath: INSIDE } };
+  assert.deepEqual(assertWorkspaceDisjoint(nested, 'default'), { ok: true });
+  assert.deepEqual(assertWorkspaceDisjoint(nested, 'second'), { ok: true });
 });
 
 test('disjoint siblings pass', () => {

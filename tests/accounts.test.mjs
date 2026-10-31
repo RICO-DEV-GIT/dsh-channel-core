@@ -9,11 +9,12 @@ const v1 = () => ({
 const v2 = () => promote(v1());
 
 test('adding the first extra account promotes the v1 file and keeps the existing bot', () => {
-  const { value, accountId } = addAccount(v1(), { workspacePath: 'G:\\B' });
+  const { value, accountId, workspacePath } = addAccount(v1(), { appId: 'cli_new_bot' });
   assert.equal(accountId, 'account-2');
   assert.equal(value.schemaVersion, 2);
   assert.equal(value.accounts.default.appId, 'cli_one', 'the existing bot survives the promotion');
-  assert.equal(value.accounts['account-2'].workspacePath, 'G:\\B');
+  assert.equal(workspacePath, 'G:\\DSWork\\cli_new_bot', 'the workspace is derived from the App ID');
+  assert.equal(value.accounts['account-2'].workspacePath, workspacePath);
   assert.equal(value.accounts['account-2'].enabled, false, 'a new account waits for its bot instead of connecting empty');
   assert.match(value.accounts['account-2'].appSecretRef, /^FEISHU_APP_SECRET_ACCOUNT_2$/);
   assert.equal(value.shared.throttleMs, 750);
@@ -21,37 +22,35 @@ test('adding the first extra account promotes the v1 file and keeps the existing
 
 test('a sibling without a workspace is named when it blocks a new account', () => {
   const bare = { ...v1(), workspacePath: '' };
-  assert.throws(() => addAccount(bare, { workspacePath: 'G:\\B' }), err => {
+  assert.throws(() => addAccount(bare, { appId: 'cli_new_bot' }), err => {
     assert.equal(err.code, 'workspace-required');
-    assert.match(err.message, /账号「default」/);
+    assert.match(err.message, /机器人「default」/);
     return true;
   });
 });
 
-test('an account without a workspace is refused before anything is written', () => {
-  assert.throws(() => addAccount(v1(), { workspacePath: '   ' }), err => {
+test('adding a bot without an App ID is refused: the id defines the folder', () => {
+  assert.throws(() => addAccount(v1(), {}), err => {
     assert.equal(err.code, 'workspace-required');
-    assert.match(err.message, /请先为该账号选择工作区/);
+    assert.match(err.message, /工作区由 App ID 决定/);
     return true;
   });
 });
 
-test('overlapping workspaces are refused and name the conflicting account', () => {
-  assert.throws(() => addAccount(v1(), { workspacePath: 'G:\\A\\inner' }), err => {
-    assert.equal(err.code, 'workspace-overlap');
-    assert.match(err.message, /default/);
-    return true;
-  });
-  assert.throws(() => addAccount(v1(), { workspacePath: 'g:\\a' }), /重叠/);
+test('an identical workspace is refused and names the conflicting account', () => {
+  const withTwo = addAccount(v1(), { appId: 'cli_new_bot' }).value;
+  // Point the new account at the existing bot's folder by hand and re-add it.
+  withTwo.accounts['account-2'].workspacePath = 'g:\\a';
+  assert.throws(() => addAccount(withTwo, { appId: 'cli_third', workspacePath: 'G:\\A' }), /同一个工作区/);
 });
 
 test('adding twice with the same id is refused', () => {
-  const first = addAccount(v1(), { workspacePath: 'G:\\B' });
-  assert.throws(() => addAccount(first.value, { workspacePath: 'G:\\C', accountId: 'account-2' }), /账号已存在/);
+  const first = addAccount(v1(), { appId: 'cli_new_bot' });
+  assert.throws(() => addAccount(first.value, { appId: 'cli_other', accountId: 'account-2' }), /账号已存在/);
 });
 
 test('removing an account fixes the default and reports what went away', () => {
-  const withTwo = addAccount(v1(), { workspacePath: 'G:\\B' }).value;
+  const withTwo = addAccount(v1(), { appId: 'cli_new_bot' }).value;
   const { value, removed } = removeAccount(withTwo, 'default');
   assert.equal(removed.appId, 'cli_one');
   assert.deepEqual(Object.keys(value.accounts), ['account-2']);

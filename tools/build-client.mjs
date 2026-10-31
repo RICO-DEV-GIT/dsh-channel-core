@@ -239,7 +239,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
         setAddScan({status:'saving',qr:null,message:'已扫码，正在保存并连接…'});
         let created=null;
         try{
-          created=await scope.call('accountCreate',{workspacePath:pendingWorkspace.current});
+          created=await scope.call('accountCreate',{appId:result.appId});
           const ref=created?.credentialRef;
           if(result.appSecret&&credentialApi&&ref){
             const saved=await credentialApi.set(ref,result.appSecret);
@@ -249,7 +249,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
           const fresh=await scope.call('getConfig',{});
           setAccounts(fresh?.accounts??null);
           setAddScan(null);
-          setNotice('已添加机器人 '+(result.appId||'')+'，工作区 '+pendingWorkspace.current);
+          setNotice('已添加机器人 '+(result.appId||'')+'，工作区 '+(created.workspacePath||''));
           await scope.reload();
         }catch(error){
           // Never leave a row behind that cannot work: undo the account we created.
@@ -271,31 +271,17 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       setAddScan({status:'error',qr:null,message:result.message||'扫码未完成，请重试。'});
     };
     // Two ways to add, like the reference channel UI: scan (quick) or paste the
-    // App ID + secret (manual). Both end in the same place — one new row.
+    // App ID + secret (manual). Neither asks for a workspace: it is derived from
+    // the App ID as G:\DSWork\<appId>, so appId uniqueness gives folder uniqueness.
     const [addMode,setAddMode]=React.useState('quick');
     const [manualAppId,setManualAppId]=React.useState('');
     const [manualSecret,setManualSecret]=React.useState('');
-    // The chosen directory is shown, not just remembered: it is the bot's workspace
-    // and the operator must be able to see and change it before committing.
-    const [addWorkspace,setAddWorkspace]=React.useState('');
-    const chooseWorkspace=async()=>{
-      const bridge=globalThis.__DSH_DIRECTORY_PICKER__;
-      if(!bridge||typeof bridge.pick!=='function'){setNotice('当前客户端不支持系统目录选择。');return null;}
-      const picked=await bridge.pick();
-      if(typeof picked!=='string'||!picked)return null;
-      pendingWorkspace.current=picked;
-      setAddWorkspace(picked);
-      return picked;
-    };
     const addRobot=async()=>{
       setAccountBusy('add');
       try{
         setAddMode('quick');
         setManualAppId('');
         setManualSecret('');
-        setAddWorkspace('');
-        const picked=await chooseWorkspace();
-        if(!picked)return;
         setAddScan({status:'begin',qr:null,message:'正在生成二维码…'});
         const begun=await scope.call('registrationBegin',{domain:'feishu'});
         if(!begun?.qr)throw new Error(begun?.message||'未返回二维码');
@@ -308,21 +294,19 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       const appIdText=manualAppId.trim();
       const secret=manualSecret.trim();
       if(!appIdText||!secret){setAddScan({status:'error',qr:null,message:'请填写 App ID 和 App Secret'});return;}
-      if(!pendingWorkspace.current){setAddScan({status:'error',qr:null,message:'请先选择该机器人的工作区'});return;}
       setAccountBusy('add');
       setAddScan({status:'saving',qr:null,message:'正在保存并连接…'});
       let created=null;
       try{
-        created=await scope.call('accountCreate',{workspacePath:pendingWorkspace.current});
+        created=await scope.call('accountCreate',{appId:appIdText});
         const saved=await credentialApi.set(created.credentialRef,secret);
         if(!saved.ok)throw new Error(saved.error?.message||'保存密钥失败');
-        // The account exists and its secret is stored; write the App ID through the
-        // normal save path so the same validation runs as an edit.
-        const current=await scope.call('getConfig',{accountId:created.accountId});
-        await scope.call('setConfig',{value:{...current.value,appId:appIdText,enabled:true},revision:current.revision,accountId:created.accountId});
+        // Bind through the same path as a scan, so owner/allow rules and the
+        // duplicate + workspace checks all run server-side.
+        await scope.call('registrationApply',{appId:appIdText,openId:'',domain:'',accountId:created.accountId});
         await refreshAccounts();
         setAddScan(null);
-        setNotice('已添加机器人 '+appIdText+'，工作区 '+pendingWorkspace.current);
+        setNotice('已添加机器人 '+appIdText+'，工作区 '+(created.workspacePath||''));
         await scope.reload();
       }catch(error){
         if(created?.accountId){try{await scope.call('accountRemove',{accountId:created.accountId});}catch{}await refreshAccounts();}
