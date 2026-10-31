@@ -12,10 +12,11 @@ test('the merged bot panel keeps the scan-to-create/connect flow', () => {
   assert(source.includes("scope.call('registrationBegin'"), 'begin is fetched through the channel settings service');
   assert(source.includes("scope.call('registrationPoll'"), 'the scan outcome is polled through the same service');
   assert(source.includes("scope.call('registrationApply'"), 'the returned credentials are applied server-side');
-  assert(source.includes("scope.call('botCard',{})"), 'the connected state still asks for the chat QR');
   assert(source.includes('credentialApi.set('), 'a fresh bot secret is saved through the standard credential API');
   assert(source.includes('FEISHU_APP_SECRET'), 'the default secret reference is used as a fallback');
-  assert(source.includes("scope.runAction()"), 'a configured-but-disconnected bot can be reconnected from the card');
+  assert(source.includes('快捷配置'), 'the quick (scan) mode is offered');
+  assert(source.includes('手动配置'), 'the manual (App ID + secret) mode is offered');
+  assert(source.includes('添加并应用'), 'manual mode applies through the same create path');
 });
 
 test('the bot panel never renders the device code in the page', () => {

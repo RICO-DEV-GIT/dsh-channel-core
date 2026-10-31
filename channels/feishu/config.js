@@ -91,8 +91,9 @@ function validateShared(raw){
 }
 
 function validateMulti(input){
+  // Zero accounts is a legal state: it means "this channel has no bot right now",
+  // which is what the page shows after the last bot is deleted.
   const accounts=Object.entries(input.accounts??{});
-  if(!accounts.length)throw new ConfigError('invalid-config','至少需要配置一个机器人账号');
   const checked={};
   for(const [accountId,raw] of accounts){
     if(!ACCOUNT_ID.test(accountId))throw new ConfigError('invalid-config','账号 ID 只能包含字母、数字、下划线和短横线：'+accountId);
@@ -102,7 +103,7 @@ function validateMulti(input){
   if(defaultAccount&&!Object.hasOwn(checked,defaultAccount))throw new ConfigError('invalid-config','默认账号不存在：'+defaultAccount);
   return Object.freeze({
     schemaVersion:2,
-    defaultAccount:defaultAccount||Object.keys(checked)[0],
+    defaultAccount:defaultAccount||Object.keys(checked)[0]||'',
     accounts:Object.freeze(checked),
     shared:validateShared(input.shared),
   });

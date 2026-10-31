@@ -7,16 +7,16 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = fs.readFileSync(path.join(root, 'lib/client.js'), 'utf8');
 
-test('Feishu offers one bot entry that becomes the chat QR once connected', () => {
+test('the Feishu page is one panel with a list of bots and no name-card QR', () => {
   assert(source.includes('function FeishuBotPanel'), 'the bot panel is bundled');
   assert(!source.includes('function FeishuBotCard'), 'the old separate card is gone');
   assert(!source.includes('function FeishuRegistrationCard'), 'the old separate registration card is gone');
   assert(source.includes('e(FeishuBotPanel,{scope:rootScope,credentialApi})'), 'only the Feishu tab renders it, once');
-  assert(source.includes("head('添加飞书机器人'"), 'the add-a-bot state');
-  assert(source.includes("head('机器人已连接'"), 'connected state');
-  assert(source.includes('打开与它的私聊'), 'the connected state explains the chat QR');
-  assert(source.includes('二维码只包含机器人公开 open_id，不含任何密钥。'), 'the page states what the QR carries');
-  assert(source.includes('复制链接'), 'the link stays usable without a camera');
+  assert(source.includes("head('飞书机器人'"), 'one page title, in every state');
+  // The name-card QR was removed on purpose: no QR appears unless a bot is added.
+  assert(!source.includes("scope.call('botCard'"), 'the name-card QR is no longer fetched');
+  assert(!source.includes('复制链接'), 'the name-card link block is gone');
+  assert(!source.includes('名片二维码'), 'the copy no longer mentions a name card');
 });
 
 test('there is only add and delete: no replace, no switch, no persistent QR', () => {
@@ -41,7 +41,7 @@ test('there is only add and delete: no replace, no switch, no persistent QR', ()
 test('each state exposes at most two actions', () => {
   assert(!source.includes(",'刷新二维码')"), 'the duplicate refresh button is gone');
   assert(!source.includes(",'重新连接')"), 'the duplicate reconnect button is gone');
-  assert.equal((source.match(/'复制链接'/g) ?? []).length, 1, 'only one copy-link button');
+  assert.equal((source.match(/'复制链接'/g) ?? []).length, 0, 'no copy-link button remains');
 });
 
 test('the credential fields are not rendered twice', () => {
@@ -82,7 +82,7 @@ test('the workspace can be changed at any time, not only when it is missing', ()
   // the only way to pick a different directory.
   assert(source.includes('更换目录…'), 'a replace action is offered when a workspace exists');
   assert(source.includes('dcb-workspace'), 'the line renders outside the health block');
-  assert.equal((source.match(/workspaceLine\(\)/g) ?? []).length, 2, 'both connected states render it');
+  assert.equal((source.match(/workspaceLine\(\)/g) ?? []).length, 1, 'the single layout renders it once');
 });
 
 test('the console checklist only appears when it can help', () => {
@@ -94,7 +94,7 @@ test('the bot list offers only add and delete', () => {
   assert(source.includes('+ 添加机器人'), 'one button adds a bot');
   assert(source.includes(",'删除'"), 'each bot can be deleted');
   assert(source.includes('确认删除'), 'deletion needs a second click');
-  assert(source.includes('至少保留一个机器人'), 'the last bot cannot be deleted');
+  assert(!source.includes('至少保留一个机器人'), 'every bot can be deleted, including the last');
   assert(!source.includes('+ 新增账号'), 'the separate "create an empty account" step is gone');
   assert(!source.includes("row.appId?null:e('button'"), 'no row-level add-bot button remains');
 });

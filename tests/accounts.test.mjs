@@ -58,16 +58,18 @@ test('removing an account fixes the default and reports what went away', () => {
   assert.equal(value.defaultAccount, 'account-2', 'the default moves to the survivor');
 });
 
-test('the last account cannot be removed', () => {
+test('every bot can be removed, including the last one', () => {
   const withTwo = addAccount(v1(), { workspacePath: 'G:\\B' }).value;
   const one = removeAccount(withTwo, 'account-2').value;
-  assert.throws(() => removeAccount(one, 'default'), /至少需要保留一个账号/);
-  assert.throws(() => removeAccount(v1(), 'default'), /只有一个账号/);
+  const none = removeAccount(one, 'default').value;
+  assert.deepEqual(none.accounts, {});
+  assert.equal(none.defaultAccount, '', 'no default is kept when nothing is left');
+  assert.throws(() => removeAccount(v1(), 'default'), /只有一个机器人/);
 });
 
 test('removing an unknown account is an error, not a silent no-op', () => {
   const withTwo = addAccount(v1(), { workspacePath: 'G:\\B' }).value;
-  assert.throws(() => removeAccount(withTwo, 'ghost'), /账号不存在/);
+  assert.throws(() => removeAccount(withTwo, 'ghost'), /机器人不存在/);
 });
 
 test('a credential is only discarded when no other account uses it', () => {

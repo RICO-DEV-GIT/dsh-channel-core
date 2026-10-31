@@ -29,7 +29,7 @@ if(adapt.discord.fields.length<5||adapt.feishu.fields.length<5)throw Error('miss
 const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
   const bundledConfigCss=${JSON.stringify(css)};
   const botCss='.dcb-bot{margin:0 0 22px;padding:18px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-2)}.dcb-bot-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}.dcb-bot-head h3{margin:0 0 6px;font-size:15px}.dcb-bot-head p{margin:0;max-width:44em;font-size:13px;line-height:1.6;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-bot-btn,.dcb-bot-copy{padding:7px 14px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:inherit;cursor:pointer;font-size:13px}.dcb-bot-btn:disabled{opacity:.6;cursor:default}.dcb-bot-body{display:flex;gap:18px;align-items:center;margin-top:16px;flex-wrap:wrap}.dcb-bot-body img{border-radius:8px;background:#fff;flex:0 0 auto}.dcb-bot-meta{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1 1 220px}.dcb-bot-link{font-size:12px;word-break:break-all;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-bot-msg{margin:12px 0 0;font-size:13px;color:var(--dsw-alias-label-secondary,#8a8f99)}';
-  const regCss='.dcb-reg{margin:0 0 22px;padding:18px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-2)}.dcb-reg-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}.dcb-reg-head h3{margin:0 0 6px;font-size:15px}.dcb-reg-head p{margin:0;max-width:44em;font-size:13px;line-height:1.6;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-reg-body{display:flex;gap:18px;align-items:center;margin-top:16px;flex-wrap:wrap}.dcb-reg-body img{border-radius:8px;background:#fff;flex:0 0 auto}.dcb-reg-msg{margin:12px 0 0;font-size:13px;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-reg-err{color:var(--dsw-alias-state-error-primary,#d64545)}.dcb-preset{margin:0 0 16px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-2);font-size:12px;line-height:1.7;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-preset code{color:inherit;font-size:12px}.dcb-preset-warn{border-color:var(--dsw-alias-state-error-primary,#d64545);color:var(--dsw-alias-state-error-primary,#d64545)}.dcb-bot-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}.dcb-checklist{margin-top:14px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l2);font-size:12px;line-height:1.8;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-checklist-head{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.dcb-checklist ol{margin:8px 0 0;padding-left:20px}.dcb-checklist li{margin:4px 0}.dcb-health{margin:0 0 14px;padding:12px 14px;border:1px solid var(--dsw-alias-state-error-primary,#d64545);border-radius:10px;background:var(--dsw-alias-bg-layer-2);font-size:12px;line-height:1.9;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-health strong{display:block;margin-bottom:4px;color:var(--dsw-alias-label-primary,#1f2329);font-size:13px}.dcb-health ul{margin:0;padding:0;list-style:none;display:grid;gap:6px}.dcb-health li{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.dcb-health .dcb-ok{opacity:.75}.dcb-health-form{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}.dcb-health-form input{box-sizing:border-box;min-width:180px;padding:6px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:inherit;font:inherit}.dcb-workspace{border-color:var(--dsw-alias-border-l2);margin-top:0;margin-bottom:14px}.dcb-workspace .dcb-health-head{justify-content:space-between;align-items:center}.dcb-workspace strong{font-size:12px;font-weight:500}.dcb-accounts{margin:0 0 14px;padding:12px 14px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;font-size:12px;line-height:1.8}.dcb-accounts ul{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:10px}.dcb-account{display:grid;gap:6px;padding:10px 0;border-top:1px solid var(--dsw-alias-border-l1)}.dcb-account-main{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.dcb-account-main code{font-size:11px;opacity:.8}';
+  const regCss='.dcb-reg{margin:0 0 22px;padding:18px;border:1px solid var(--dsw-alias-border-l2);border-radius:12px;background:var(--dsw-alias-bg-layer-2)}.dcb-reg-head{display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}.dcb-reg-head h3{margin:0 0 6px;font-size:15px}.dcb-reg-head p{margin:0;max-width:44em;font-size:13px;line-height:1.6;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-reg-body{display:flex;gap:18px;align-items:center;margin-top:16px;flex-wrap:wrap}.dcb-reg-body img{border-radius:8px;background:#fff;flex:0 0 auto}.dcb-reg-msg{margin:12px 0 0;font-size:13px;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-reg-err{color:var(--dsw-alias-state-error-primary,#d64545)}.dcb-preset{margin:0 0 16px;padding:10px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-2);font-size:12px;line-height:1.7;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-preset code{color:inherit;font-size:12px}.dcb-preset-warn{border-color:var(--dsw-alias-state-error-primary,#d64545);color:var(--dsw-alias-state-error-primary,#d64545)}.dcb-bot-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}.dcb-checklist{margin-top:14px;padding-top:12px;border-top:1px solid var(--dsw-alias-border-l2);font-size:12px;line-height:1.8;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-checklist-head{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.dcb-checklist ol{margin:8px 0 0;padding-left:20px}.dcb-checklist li{margin:4px 0}.dcb-health{margin:0 0 14px;padding:12px 14px;border:1px solid var(--dsw-alias-state-error-primary,#d64545);border-radius:10px;background:var(--dsw-alias-bg-layer-2);font-size:12px;line-height:1.9;color:var(--dsw-alias-label-secondary,#8a8f99)}.dcb-health strong{display:block;margin-bottom:4px;color:var(--dsw-alias-label-primary,#1f2329);font-size:13px}.dcb-health ul{margin:0;padding:0;list-style:none;display:grid;gap:6px}.dcb-health li{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.dcb-health .dcb-ok{opacity:.75}.dcb-health-form{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap}.dcb-health-form input{box-sizing:border-box;min-width:180px;padding:6px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:inherit;font:inherit}.dcb-workspace{border-color:var(--dsw-alias-border-l2);margin-top:0;margin-bottom:14px}.dcb-workspace .dcb-health-head{justify-content:space-between;align-items:center}.dcb-workspace strong{font-size:12px;font-weight:500}.dcb-add-tabs{display:flex;gap:8px;margin:8px 0}.dcb-add-tab{padding:6px 12px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:inherit;cursor:pointer;font-size:12px}.dcb-add-tab-on{border-color:var(--dsw-alias-brand-primary,#4d6bfe);font-weight:600}.dcb-manual{display:grid;gap:8px;margin:8px 0;max-width:420px}.dcb-manual input{box-sizing:border-box;width:100%;padding:8px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:8px;background:var(--dsw-alias-bg-layer-1);color:inherit;font:inherit}.dcb-accounts{margin:0 0 14px;padding:12px 14px;border:1px solid var(--dsw-alias-border-l2);border-radius:10px;font-size:12px;line-height:1.8}.dcb-accounts ul{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:10px}.dcb-account{display:grid;gap:6px;padding:10px 0;border-top:1px solid var(--dsw-alias-border-l1)}.dcb-account-main{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.dcb-account-main code{font-size:11px;opacity:.8}';
   // One entry for the whole Feishu bot lifecycle: scan to create/connect,
   // paste existing credentials, then — once connected — scan to open the chat.
   // Two cards made the operator guess which QR to press; the state now decides.
@@ -84,36 +84,10 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     const connected=(snapshot?.details??{}).connected===true;
     const appId=String(config.appId??'').trim();
     const secretRef=String(config.appSecretRef||'FEISHU_APP_SECRET');
-    const [card,setCard]=React.useState({status:'idle',png:null,link:null,name:''});
     // Feedback that is not a form error (copy result, retry result) gets its own
     // slot instead of borrowing the credential form's message line.
     const [notice,setNotice]=React.useState('');
     const [checklist,setChecklist]=React.useState(false);
-    // One loader for the first render, the retry button and a credential change:
-    // it used to call reload(), which refreshed the form but never asked for a
-    // new card, so the panel sat on the loading text forever.
-    const fetchCard=React.useCallback(async()=>{
-      setCard({status:'loading',png:null,link:null,name:'',message:''});
-      try{
-        const value=await scope.call('botCard',{});
-        setCard(value
-          ?{status:'ready',png:value.png,link:value.link,name:value.name,message:''}
-          :{status:'empty',png:null,link:null,name:'',message:'已连接，但暂未取到机器人身份；请确认应用已开启机器人能力后点「重新生成二维码」重试。'});
-      }catch(error){
-        setCard({status:'error',png:null,link:null,name:'',message:'二维码生成失败：'+(error?.message||'未知原因')});
-      }
-    },[scope]);
-    React.useEffect(()=>{
-      if(!connected){setCard({status:'idle',png:null,link:null,name:'',message:''});return;}
-      // appId is a dependency too: replacing the bot while already connected can
-      // complete faster than the page's poll observes connected=false, and the
-      // QR would otherwise keep showing the previous bot.
-      void fetchCard();
-    },[connected,appId,fetchCard]);
-    const copy=async()=>{
-      try{await navigator.clipboard.writeText(card.link);setNotice('链接已复制');}
-      catch{setNotice('复制失败，请手动选中链接复制');}
-    };
     // First-run health: the three things that make a scan useless when missing
     // (switch off, credentials absent, no workspace). Each failing row offers
     // the fix in place instead of waiting for a failure message later.
@@ -296,6 +270,11 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       stopAdd();
       setAddScan({status:'error',qr:null,message:result.message||'扫码未完成，请重试。'});
     };
+    // Two ways to add, like the reference channel UI: scan (quick) or paste the
+    // App ID + secret (manual). Both end in the same place — one new row.
+    const [addMode,setAddMode]=React.useState('quick');
+    const [manualAppId,setManualAppId]=React.useState('');
+    const [manualSecret,setManualSecret]=React.useState('');
     const addRobot=async()=>{
       const bridge=globalThis.__DSH_DIRECTORY_PICKER__;
       if(!bridge||typeof bridge.pick!=='function'){setNotice('当前客户端不支持系统目录选择，无法添加机器人。');return;}
@@ -304,12 +283,41 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
         const picked=await bridge.pick();
         if(typeof picked!=='string'||!picked)return;
         pendingWorkspace.current=picked;
+        setAddMode('quick');
+        setManualAppId('');
+        setManualSecret('');
         setAddScan({status:'begin',qr:null,message:'正在生成二维码…'});
         const begun=await scope.call('registrationBegin',{domain:'feishu'});
         if(!begun?.qr)throw new Error(begun?.message||'未返回二维码');
         setAddScan({status:'waiting',qr:begun.qr,message:'用手机飞书扫码；完成后会自动创建并连接'});
         void addPoll(begun.deviceCode,Date.now()+(begun.expiresIn??300)*1000);
       }catch(error){setAddScan({status:'error',qr:null,message:'生成二维码失败：'+error.message});}
+      finally{setAccountBusy('');}
+    };
+    const applyManual=async()=>{
+      const appIdText=manualAppId.trim();
+      const secret=manualSecret.trim();
+      if(!appIdText||!secret){setAddScan({status:'error',qr:null,message:'请填写 App ID 和 App Secret'});return;}
+      if(!pendingWorkspace.current){setAddScan({status:'error',qr:null,message:'请先选择该机器人的工作区'});return;}
+      setAccountBusy('add');
+      setAddScan({status:'saving',qr:null,message:'正在保存并连接…'});
+      let created=null;
+      try{
+        created=await scope.call('accountCreate',{workspacePath:pendingWorkspace.current});
+        const saved=await credentialApi.set(created.credentialRef,secret);
+        if(!saved.ok)throw new Error(saved.error?.message||'保存密钥失败');
+        // The account exists and its secret is stored; write the App ID through the
+        // normal save path so the same validation runs as an edit.
+        const current=await scope.call('getConfig',{accountId:created.accountId});
+        await scope.call('setConfig',{value:{...current.value,appId:appIdText,enabled:true},revision:current.revision,accountId:created.accountId});
+        await refreshAccounts();
+        setAddScan(null);
+        setNotice('已添加机器人 '+appIdText+'，工作区 '+pendingWorkspace.current);
+        await scope.reload();
+      }catch(error){
+        if(created?.accountId){try{await scope.call('accountRemove',{accountId:created.accountId});}catch{}await refreshAccounts();}
+        setAddScan({status:'error',qr:null,message:'添加失败：'+error.message});
+      }
       finally{setAccountBusy('');}
     };
     const removeAccount=async accountId=>{
@@ -330,12 +338,21 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
         e('div',{className:'dcb-health-head'},
           e('strong',null,'机器人（'+accounts.length+'）'),
           e('button',{type:'button',className:'dcb-bot-btn',disabled:accountBusy==='add',onClick:()=>{void addRobot();}},'+ 添加机器人')),
-        e('p',{className:'dcb-bot-link'},'每个机器人使用独立工作区、独立会话；同一个机器人只能添加一次。'),
+        e('p',{className:'dcb-bot-link'},accounts.length?'每个机器人使用独立工作区、独立会话；同一个机器人只能添加一次。':'还没有机器人，点「+ 添加机器人」开始。'),
         addScan?e('div',{className:'dcb-reg-body'},
-          addScan.qr?e('img',{src:addScan.qr,alt:'飞书扫码二维码',width:200,height:200}):null,
           e('div',{className:'dcb-bot-meta'},
-            e('strong',null,'扫码添加机器人'),
-            e('p',{className:'dcb-reg-msg'+(addScan.status==='error'?' dcb-reg-err':'')},addScan.message),
+            e('div',{className:'dcb-add-tabs'},
+              e('button',{type:'button',className:addMode==='quick'?'dcb-add-tab dcb-add-tab-on':'dcb-add-tab',onClick:()=>setAddMode('quick')},'快捷配置'),
+              e('button',{type:'button',className:addMode==='manual'?'dcb-add-tab dcb-add-tab-on':'dcb-add-tab',onClick:()=>setAddMode('manual')},'手动配置')),
+            addMode==='quick'
+              ?e(React.Fragment,null,
+                addScan.qr?e('img',{src:addScan.qr,alt:'飞书扫码二维码',width:200,height:200}):null,
+                e('p',{className:'dcb-reg-msg'+(addScan.status==='error'?' dcb-reg-err':'')},addScan.message))
+              :e('div',{className:'dcb-manual'},
+                e('input',{type:'text',value:manualAppId,placeholder:'飞书应用的 App ID',onChange:event=>setManualAppId(event.target.value),'aria-label':'App ID'}),
+                e('input',{type:'password',value:manualSecret,autoComplete:'new-password',placeholder:'飞书应用的 App Secret',onChange:event=>setManualSecret(event.target.value),'aria-label':'App Secret'}),
+                e('button',{type:'button',className:'dcb-bot-btn',disabled:accountBusy==='add',onClick:()=>{void applyManual();}},'添加并应用'),
+                addScan.status==='error'?e('p',{className:'dcb-reg-msg dcb-reg-err'},addScan.message):null),
             e('div',{className:'dcb-bot-actions'},
               e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{stopAdd();setAddScan(null);}},'取消')))):null,
         e('ul',null,accounts.map(row=>e('li',{key:row.id,className:'dcb-account'},
@@ -350,7 +367,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
                 e('span',{className:'dcb-reg-err'},'历史与凭证一并删除'),
                 e('button',{type:'button',className:'dcb-bot-btn',disabled:accountBusy===row.id,onClick:()=>{void removeAccount(row.id);}},'确认删除'),
                 e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>setConfirmDelete('')},'取消'))
-              :e('button',{type:'button',className:'dcb-bot-copy',disabled:accounts.length<2,title:accounts.length<2?'至少保留一个机器人':'',onClick:()=>setConfirmDelete(row.id)},'删除'))))));
+              :e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>setConfirmDelete(row.id)},'删除'))))));
     };
     const accountPicker=()=>{
       const list=accounts??[];
@@ -392,29 +409,17 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       return e('section',{className:'dcb-bot'},
         e('div',{className:'dcb-bot-head'},e('div',null,e('h3',null,'飞书机器人'),e('p',null,'正在读取渠道设置…'))));
     }
-    if(!connected){
+    // No bots at all: only the list (with its add button) and the hint make sense;
+    // the workspace line and health checks describe a bot that does not exist yet.
+    if(accounts&&accounts.length===0){
       return e('section',{className:'dcb-bot'},
-        head('添加飞书机器人','点「+ 添加机器人」：先为它选择独立的工作区，再用手机飞书扫码。每个机器人独立工作区、独立会话，可以同时在线。'),
-        accountPicker(),
-        healthBlock(),
-        workspaceLine(),
+        head('飞书机器人','还没有机器人。点「+ 添加机器人」：先为它选择独立的工作区，再用手机飞书扫码。'),
         accountsBlock(),
         noticeLine(),
         checklistBlock());
     }
     return e('section',{className:'dcb-bot'},
-      head('机器人已连接',(card.name||'机器人')+'：下面这张是它的名片二维码，扫码即可打开与它的私聊；发送任意消息后按「主人与记忆」的规则完成认领。二维码只包含机器人公开 open_id，不含任何密钥。'),
-      card.png?e('div',{className:'dcb-bot-body'},
-        e('img',{src:card.png,alt:'飞书机器人二维码',width:220,height:220}),
-        e('div',{className:'dcb-bot-meta'},
-          e('strong',null,card.name||'飞书机器人'),
-          e('code',{className:'dcb-bot-link'},card.link),
-          e('div',{className:'dcb-bot-actions'},
-            e('button',{type:'button',className:'dcb-bot-copy',onClick:copy},'复制链接'))))
-        :e(React.Fragment,null,
-          e('p',{className:'dcb-bot-msg'+(card.status==='error'?' dcb-reg-err':''),role:card.status==='error'?'alert':undefined},card.message||'正在生成二维码…'),
-          e('div',{className:'dcb-bot-actions'},
-            e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void fetchCard();}},'重新生成二维码'))),
+      head('飞书机器人','「+ 添加机器人」：先为它选择独立的工作区，再用手机飞书扫码。每个机器人独立工作区、独立会话，可以同时在线；不再需要时点该行的「删除」。'),
       accountPicker(),
       healthBlock(),
       workspaceLine(),
@@ -455,10 +460,12 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     const credentials=refs?value=>Object.fromEntries(Object.entries(refs).map(([key,label])=>[value[key],label])):undefined;
     return e(React.Fragment,null,
       kind==='feishu'?e(FeishuBotPanel,{scope:rootScope,credentialApi}):null,
-      e(AgentPresetHint,{scope}),
+      // With no bot selected (or no bots at all) the form has no account to edit;
+      // rendering it against the whole file would save a v2 object as one slice.
+      kind!=='feishu'||selected?e(AgentPresetHint,{scope}):null,
       // key: switching account remounts the form, so an unsaved draft can never be
       // saved onto the account that was just selected.
-      e(FileConfigPage,{...page,key:kind==='feishu'?(selected||'default'):'single',scope,credentialApi,credentials,credentialTitle:kind==='discord'?'Discord Bot Token':'飞书应用密钥',credentialsFirst:kind==='discord'}));
+      kind!=='feishu'||selected?e(FileConfigPage,{...page,key:selected||'default',scope,credentialApi,credentials,credentialTitle:kind==='discord'?'Discord Bot Token':'飞书应用密钥',credentialsFirst:kind==='discord'}):null);
   }
   function ChannelBundlePage({connection,credentialApi,t}) {
     const [tab,setTab]=React.useState('general');

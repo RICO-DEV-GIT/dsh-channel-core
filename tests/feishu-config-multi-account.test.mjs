@@ -43,7 +43,10 @@ test('a v2 object validates, defaults the default account and freezes accounts',
 
 test('v2 rejects the shapes that would make accounts ambiguous', () => {
   const base = { schemaVersion: 2, accounts: { a: { appId: 'cli_a' } } };
-  assert.throws(() => schema.validate({ schemaVersion: 2, accounts: {} }), /至少需要配置一个机器人账号/);
+  // Zero accounts is a legal state (the page shows "no bots yet").
+  const empty = schema.validate({ schemaVersion: 2, accounts: {} });
+  assert.deepEqual(Object.keys(empty.accounts), []);
+  assert.equal(empty.defaultAccount, '');
   assert.throws(() => schema.validate({ ...base, defaultAccount: 'missing' }), /默认账号不存在/);
   assert.throws(() => schema.validate({ schemaVersion: 2, accounts: { 'bad id': { appId: 'x' } } }), /账号 ID/);
   assert.throws(() => schema.validate({ schemaVersion: 2, accounts: { a: { appId: 'x', unknown: 1 } } }), /未知的账号配置项/);
