@@ -49,13 +49,14 @@ test('the credential fields are not rendered twice', () => {
   assert.equal(pages.feishu.credentialFields, undefined, 'no separate credential block');
 });
 
-test('first-run health names the three settings that make a scan useless', () => {
-  // Scanning while the switch is off (or without a workspace) used to look like
-  // success; the panel now lists what is still missing and fixes it in place.
+test('first-run health names the settings that make a scan useless', () => {
+  // Scanning while the switch is off (or without credentials) used to look like
+  // success; the panel lists what is still missing and fixes it in place. The
+  // workspace has its own always-visible line, so it is not repeated here.
   assert(source.includes('首次使用还差这几项'), 'the health block is discoverable');
   assert(source.includes('已开启「连接渠道」'), 'the switch is checked');
   assert(source.includes('App ID 与密钥已就绪'), 'credentials are checked');
-  assert(source.includes('已指定工作区目录'), 'the workspace is checked');
+  assert(source.includes('工作区：'), 'the workspace has its own line');
   assert(source.includes('打开连接渠道'), 'the switch can be fixed in place');
   assert(source.includes('选择目录…'), 'the workspace can be picked, not typed');
   assert(source.includes('credentialApi.describe([secretRef])'), 'credential state comes from the host, not a guess');
