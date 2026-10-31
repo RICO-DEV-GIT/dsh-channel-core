@@ -2,6 +2,15 @@
 
 This file holds historical behavior notes formerly embedded in README. For current setup and behavior, start with [README.md](README.md) or [简体中文](README.zh-CN.md).
 
+## 未发布 · 模型切换卡片
+
+- `/model`（不带参数）在飞书里改为发送一张**选择卡片**：提供方下拉 + 该提供方的模型下拉 + 「切换」按钮，并支持分页。手机上一个 profile 可能有上百个模型，纯文本列表既读不完也记不住；卡片里点选即可，切换后同一张卡片就地更新为「已切换 …，下一次请求生效」。
+- 只列出可对话的模型：`embedding / seedream / seedance / tts / vision` 等按名字过滤（某提供方若全部被过滤则原样保留，避免列表变空）。
+- 每页 18 个选项，超出显示「上一页 / 下一页」，不撞飞书下拉的选项上限。
+- 文本回答保留为降级：卡片构造失败（无 catalog、旧客户端）时仍发原来的 `/model` 文本。
+- 卡片回调走 `cardAction` → `host.modelPicker` → `selectModel`，与 Ask User 的回答通道互不影响；卡片失效时提示「请重新发送 /model」。
+- 测试：卡片构造 6 个、传输层回调 4 个。
+
 ## 0.7.5
 
 - The Feishu page now has **one** bot entry instead of two. `FeishuBotCard` and `FeishuRegistrationCard` are merged into `FeishuBotPanel`, which picks its state from the channel instead of asking the operator to guess which QR to press:

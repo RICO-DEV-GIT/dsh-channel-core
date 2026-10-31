@@ -10,6 +10,7 @@ import { verifyQueuedImage } from '../../lib/outbound-image.js';
 import { verifyQueuedFile } from '../../lib/outbound-file.js';
 import { buildBotCard } from '../../lib/bot-card.js';
 import { channelHint } from '../../lib/channel-hints.js';
+import { readModelPickerAction } from '../../lib/model-picker-card.js';
 
 const imageExtension=head=>{
   if(head.length>=12&&head.toString('latin1',0,4)==='RIFF'&&head.toString('latin1',8,12)==='WEBP')return 'webp';
@@ -266,6 +267,10 @@ export async function createTransport({config,credentials,signal,receive,state,d
     return {...body,agentName:role||'Agent',footerText};
   }
   const progress=new Map(),presented=new Map(),kitRecords=new Map(),questionCards=new Map(),questionContexts=new Map(),disposers=[];
+  // /model picker cards: messageId -> the Session the card edits. Kept small and
+  // dropped with the transport, because a callback for an unknown card is just
+  // reported as stale.
+  const modelCards=new Map();
   // Bot identity for the scannable card: resolved once per transport, since it
   // cannot change while the same app credentials are in use.
   let botIdentity=null;
@@ -372,6 +377,22 @@ export async function createTransport({config,credentials,signal,receive,state,d
     const token=event?.action?.value?.dsh;
     if(signal.aborted)return {toast:{type:'error',content:'渠道正在重连，请稍后重试。'}};
     if(typeof token!=='string'||!token)return {toast:{type:'error',content:'按钮缺少有效操作信息，请重新发起提问。'}};
+    // Model picker taps are host-side state changes, not Ask User answers.
+    const modelIntent=readModelPickerAction({token,values:(event.raw?.action?.form_value??event.action?.form_value)??undefined});
+    if(modelIntent){
+      const record=modelCards.get(event.messageId);
+      if(!record)return {toast:{type:'error',content:'这张卡片已失效，请重新发送 /model。'}};
+      try{
+        const result=await host?.modelPicker?.({sessionId:record.sessionId,action:modelIntent});
+        if(result?.card){
+          try{await channel.updateCard(event.messageId,result.card);}
+          catch{/* the card was recalled: report instead of throwing */ return {toast:{type:'error',content:'卡片已失效，请重新发送 /model。'}};}
+        }
+        return {toast:result?.toast??{type:'info',content:'已更新'}};
+      }catch(error){
+        return {toast:{type:'error',content:'切换失败：'+(error?.message??'未知原因')}};
+      }
+    }
     try{
       // The channel SDK exposes form_value only on the opted-in raw event.
       // Do not log raw payloads: they may contain freeform user answers.
@@ -572,6 +593,17 @@ export async function createTransport({config,credentials,signal,receive,state,d
         if(body.feishuStatusCard.schema!=='2.0'||!withinBudget(body.feishuStatusCard))
           throw new Error('feishu-status-card-invalid');
         return channel.send(origin.conversationId,{card:body.feishuStatusCard},sendOptions(origin));
+      }
+      if(body.feishuModelCard){
+        const card=body.feishuModelCard.card;
+        if(!card||card.schema!=='2.0'||!withinBudget(card))throw new Error('feishu-model-card-invalid');
+        const sent=await channel.send(origin.conversationId,{card},sendOptions(origin));
+        // Remember which Session this card edits; a tap can arrive minutes later.
+        if(sent?.messageId){
+          modelCards.set(sent.messageId,{sessionId:body.feishuModelCard.sessionId});
+          if(modelCards.size>32)modelCards.delete(modelCards.keys().next().value);
+        }
+        return sent;
       }
       // `auto` means: a private chat is read on a phone, so deliver the answer as
       // a message the reader can select and copy; a group keeps the card.
