@@ -11,7 +11,7 @@ test('Feishu offers one bot entry that becomes the chat QR once connected', () =
   assert(source.includes('function FeishuBotPanel'), 'the single bot panel is bundled');
   assert(!source.includes('function FeishuBotCard'), 'the old separate card is gone');
   assert(!source.includes('function FeishuRegistrationCard'), 'the old separate registration card is gone');
-  assert(source.includes('e(FeishuBotPanel,{scope,credentialApi})'), 'only the Feishu tab renders it, once');
+  assert(source.includes('e(FeishuBotPanel,{scope:rootScope,credentialApi})'), 'only the Feishu tab renders it, once');
   // Three states, decided by the channel state instead of by the operator.
   assert(source.includes("head('连接飞书机器人'"), 'not configured / not connected state');
   assert(source.includes("head('机器人已连接'"), 'connected state');
@@ -105,6 +105,15 @@ test('a failing connection shows the console checklist', () => {
   assert(source.includes('版本管理与发布'), 'publishing is called out');
   assert(source.includes('扫码时在手机上选择「已有机器人」会直接使用该应用的凭证'), 'the scan is the supported way to reuse an app');
   assert(source.includes('setChecklist(true)'), 'a failed connect opens it automatically');
+});
+
+test('the settings form follows the selected account', () => {
+  // Without a shared selection the bot panel and the form below it would edit
+  // different accounts, and the second bot could never be configured.
+  assert(source.includes('accountSelection'), 'one selection store is shared');
+  assert(source.includes('createAccountScope'), 'the form talks to the selected account');
+  assert(source.includes('正在编辑'), 'the page says which account is being edited');
+  assert(source.includes("useSelectedAccount"), 'both components read the same selection');
 });
 
 test('rebuilding the bundle keeps the already shipped settings renderer intact', () => {

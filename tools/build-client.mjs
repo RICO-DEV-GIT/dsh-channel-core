@@ -33,7 +33,52 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
   // One entry for the whole Feishu bot lifecycle: scan to create/connect,
   // paste existing credentials, then — once connected — scan to open the chat.
   // Two cards made the operator guess which QR to press; the state now decides.
-  function FeishuBotPanel({scope,credentialApi}) {
+  /**
+   * Which bot account the settings form is editing. The bot panel owns the list
+   * (it is the only place that can create/delete accounts) and the form follows,
+   * so "switch account" is one control, not two.
+   */
+  const accountSelection={id:'',listeners:new Set(),
+    get(){return this.id;},
+    set(id){if(this.id===id)return;this.id=id;for(const fn of this.listeners)fn();},
+    subscribe(fn){this.listeners.add(fn);return()=>this.listeners.delete(fn);}};
+  const useSelectedAccount=()=>React.useSyncExternalStore(
+    React.useCallback(fn=>accountSelection.subscribe(fn),[]),
+    React.useCallback(()=>accountSelection.get(),[]),
+    React.useCallback(()=>accountSelection.get(),[]),
+  );
+  /**
+   * A scope-shaped view over one account: same methods the settings widgets
+   * already use, but every call carries accountId and the snapshot holds that
+   * account's slice. Keeps the form code unchanged.
+   */
+  function createAccountScope(base,accountId){
+    const listeners=new Set();
+    let state={status:'loading',writable:true};
+    const publish=next=>{state=next;for(const fn of listeners)fn();};
+    const SCOPED=new Set(['getConfig','setConfig','runAction','botCard','registrationBegin','registrationPoll','registrationApply']);
+    const call=(method,args)=>{
+      const payload=SCOPED.has(method)?{accountId,...(args??{})}:args;
+      return base.call(method,payload);
+    };
+    return {
+      getSnapshot:()=>state,
+      subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn);},
+      async reload(){const result=await call('getConfig',{});publish({...result,status:'ready'});return result;},
+      async update(value,revision){const result=await call('setConfig',{value,revision:revision??state.revision});publish({...result,status:'ready'});return result;},
+      async runAction(){const result=await call('runAction',{});publish({...result,status:'ready'});return result;},
+      call,
+      close(){listeners.clear();},
+    };
+  }
+  function FeishuBotPanel({scope:rootScope,credentialApi}) {
+    const selected=useSelectedAccount();
+    const scope=React.useMemo(()=>selected?createAccountScope(rootScope,selected):rootScope,[rootScope,selected]);
+    React.useEffect(()=>{
+      if(scope===rootScope)return undefined;
+      void scope.reload().catch(()=>{});
+      return ()=>scope.close();
+    },[scope,rootScope]);
     const snapshot=useFileConfig(scope);
     const config=snapshot?.value??{};
     const connected=(snapshot?.details??{}).connected===true;
@@ -185,6 +230,14 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       catch(error){setAccounts([]);setNotice('读取账号列表失败：'+error.message);}
     };
     React.useEffect(()=>{void refreshAccounts();},[scope]);
+    // Keep the selection valid: first load picks the connected (default) account,
+    // and deleting the selected one falls back to whatever remains.
+    React.useEffect(()=>{
+      const list=accounts??[];
+      if(!list.length)return;
+      if(!selected)accountSelection.set((list.find(row=>row.connected)??list[0]).id);
+      else if(!list.some(row=>row.id===selected))accountSelection.set(list[0].id);
+    },[accounts,selected]);
     React.useEffect(()=>()=>{if(rowTimer.current)clearTimeout(rowTimer.current);},[]);
     const addAccount=async()=>{
       const bridge=globalThis.__DSH_DIRECTORY_PICKER__;
@@ -280,6 +333,16 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
           rowScan?.accountId===row.id?e('div',{className:'dcb-reg-body'},
             rowScan.qr?e('img',{src:rowScan.qr,alt:'飞书扫码二维码',width:180,height:180}):null,
             e('p',{className:'dcb-reg-msg'+(rowScan.status==='error'?' dcb-reg-err':'')},rowScan.message)):null))));
+    };
+    const accountPicker=()=>{
+      const list=accounts??[];
+      if(list.length<2)return null;
+      return e('div',{className:'dcb-health dcb-workspace'},
+        e('div',{className:'dcb-health-head'},
+          e('strong',null,'正在编辑：'+(selected||'默认账号')),
+          e('select',{className:'dcb-bot-btn',value:selected,onChange:event=>accountSelection.set(event.target.value),'aria-label':'选择要编辑的账号'},
+            list.map(row=>e('option',{key:row.id,value:row.id},
+              row.id+(row.appIdMasked?' · '+row.appIdMasked:'')+(row.connected?' · 已连接':''))))));
     };
     const poll=async deviceCode=>{
       let result;
@@ -406,6 +469,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     if(!connected){
       return e('section',{className:'dcb-bot'},
         head('连接飞书机器人','用手机飞书扫描下面的二维码：在手机上选择「新建机器人」会自动创建并写入凭证，选择「已有机器人」会直接拉取该应用的 App ID 与密钥。全程不用手填，也不用先去开发者后台重置凭证。'),
+        accountPicker(),
         healthBlock(),
         workspaceLine(),
         accountsBlock(),
@@ -429,6 +493,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
             e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void fetchCard();}},'重新生成二维码'))),
       // Still available when connected: scanning again is how a different bot is
       // added or switched to, chosen entirely on the phone.
+      accountPicker(),
       healthBlock(),
       workspaceLine(),
       accountsBlock(),
@@ -451,15 +516,24 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
   }
   function ChannelConfigPanel({connection,credentialApi,kind}) {
     const page=bundledChannelPanels[kind];
-    const scope=React.useMemo(()=>createConfigScope(connection,page.endpoint),[connection,kind]);
-    React.useEffect(()=>()=>scope.close(),[scope]);
+    const rootScope=React.useMemo(()=>createConfigScope(connection,page.endpoint),[connection,kind]);
+    React.useEffect(()=>()=>rootScope.close(),[rootScope]);
+    // The form follows whichever bot account the panel above selected; Discord has
+    // no account switcher, so it keeps its single scope.
+    const selected=useSelectedAccount();
+    const scope=React.useMemo(()=>kind==='feishu'&&selected?createAccountScope(rootScope,selected):rootScope,[rootScope,kind,selected]);
+    React.useEffect(()=>{
+      if(scope===rootScope)return undefined;
+      void scope.reload().catch(()=>{});
+      return ()=>scope.close();
+    },[scope,rootScope]);
     // Feishu credentials live in the bot panel above, which is why the Feishu
     // page definition declares no appId / secret field and no credentialFields:
     // one entry per value, and the panel can write both in one action.
     const refs=page.credentialFields;
     const credentials=refs?value=>Object.fromEntries(Object.entries(refs).map(([key,label])=>[value[key],label])):undefined;
     return e(React.Fragment,null,
-      kind==='feishu'?e(FeishuBotPanel,{scope,credentialApi}):null,
+      kind==='feishu'?e(FeishuBotPanel,{scope:rootScope,credentialApi}):null,
       e(AgentPresetHint,{scope}),
       e(FileConfigPage,{...page,scope,credentialApi,credentials,credentialTitle:kind==='discord'?'Discord Bot Token':'飞书应用密钥',credentialsFirst:kind==='discord'}));
   }
