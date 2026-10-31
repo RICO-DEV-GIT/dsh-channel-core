@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accountOwningBot, credentialRefFor, addAccount, removeAccount, resolveWorkspaceBase, joinWorkspace } from '../lib/accounts.js';
+import { accountOwningBot, credentialRefFor, addAccount, removeAccount, resolveWorkspaceBase, joinWorkspace, workspaceFor, FALLBACK_WORKSPACE_DIR } from '../lib/accounts.js';
 import { assertWorkspaceDisjoint, workspaceOverlap } from '../lib/workspace-scope.js';
 
 const base = () => ({
@@ -40,14 +40,14 @@ test('the workspace is derived from the App ID, never typed', () => {
   assert.equal(assertWorkspaceDisjoint({ 'bot-1': { workspacePath: 'G:\\DSWork' }, 'bot-2': { workspacePath: 'G:\\DSWork\\cli_x' } }, 'bot-2').ok, true);
 });
 
-test('the workspace root falls back when G:\DSWork is missing', async () => {
-  const present = await resolveWorkspaceBase({ fallback: 'C:\\plugin', exists: async () => true });
+test('the workspace root falls back to <plugin>\\DSWork when G:\\DSWork is missing', async () => {
+  const present = await resolveWorkspaceBase({ pluginRoot: 'C:\\plugin', exists: async () => true });
   assert.equal(present, 'G:\\DSWork');
-  const missing = await resolveWorkspaceBase({ fallback: 'C:\\plugin', exists: async () => false });
-  assert.equal(missing, 'C:\\plugin');
-  // The fallback itself is used even when it is the only candidate that exists.
-  const only = await resolveWorkspaceBase({ fallback: 'C:\\plugin', exists: async candidate => candidate === 'C:\\plugin' });
-  assert.equal(only, 'C:\\plugin');
+  const missing = await resolveWorkspaceBase({ pluginRoot: 'C:\\plugin', exists: async () => false });
+  assert.equal(missing, 'C:\\plugin\\DSWork');
+  assert.equal(workspaceFor('C:\\plugin\\DSWork', 'cli_x'), 'C:\\plugin\\DSWork\\cli_x');
+  assert.equal(workspaceFor('G:\\DSWork', 'cli_x'), 'G:\\DSWork\\cli_x');
+  assert.equal(workspaceFor('G:\\DSWork', ''), '', 'no app id, no workspace');
 });
 
 test('deleting a bot keeps its sibling intact', () => {
