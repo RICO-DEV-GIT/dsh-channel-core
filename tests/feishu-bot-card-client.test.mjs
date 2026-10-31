@@ -57,8 +57,20 @@ test('first-run health names the three settings that make a scan useless', () =>
   assert(source.includes('App ID 与密钥已就绪'), 'credentials are checked');
   assert(source.includes('已指定工作区目录'), 'the workspace is checked');
   assert(source.includes('打开连接渠道'), 'the switch can be fixed in place');
-  assert(source.includes('保存工作区'), 'the workspace can be set in place');
+  assert(source.includes('选择目录…'), 'the workspace can be picked, not typed');
   assert(source.includes('credentialApi.describe([secretRef])'), 'credential state comes from the host, not a guess');
+});
+
+test('the workspace uses the native directory picker with a manual fallback', () => {
+  // A typed path is the easiest way to get it wrong; the desktop bridge opens the
+  // OS dialog, which can also create a folder inside it.
+  assert(source.includes('__DSH_DIRECTORY_PICKER__'), 'it uses the desktop native picker');
+  assert(source.includes('当前客户端不支持系统目录选择'), 'a web-only client explains the fallback');
+  assert(source.includes("'手动填写'"), 'typing stays available behind a toggle');
+});
+
+test('the console checklist only appears when it can help', () => {
+  assert(source.includes('const needsHelp=!connected'), 'visibility is derived from channel state');
 });
 
 test('a failing connection shows the console checklist', () => {
