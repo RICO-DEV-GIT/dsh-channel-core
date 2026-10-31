@@ -14,9 +14,18 @@ test('adding the first extra account promotes the v1 file and keeps the existing
   assert.equal(value.schemaVersion, 2);
   assert.equal(value.accounts.default.appId, 'cli_one', 'the existing bot survives the promotion');
   assert.equal(value.accounts['account-2'].workspacePath, 'G:\\B');
-  assert.equal(value.accounts['account-2'].enabled, true);
+  assert.equal(value.accounts['account-2'].enabled, false, 'a new account waits for its bot instead of connecting empty');
   assert.match(value.accounts['account-2'].appSecretRef, /^FEISHU_APP_SECRET_ACCOUNT_2$/);
   assert.equal(value.shared.throttleMs, 750);
+});
+
+test('a sibling without a workspace is named when it blocks a new account', () => {
+  const bare = { ...v1(), workspacePath: '' };
+  assert.throws(() => addAccount(bare, { workspacePath: 'G:\\B' }), err => {
+    assert.equal(err.code, 'workspace-required');
+    assert.match(err.message, /账号「default」/);
+    return true;
+  });
 });
 
 test('an account without a workspace is refused before anything is written', () => {

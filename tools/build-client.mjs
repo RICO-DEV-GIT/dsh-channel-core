@@ -221,12 +221,18 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       }
       if(result.status==='success'){
         try{
-          if(result.appSecret&&credentialApi&&credentialRef){
-            const saved=await credentialApi.set(credentialRef,result.appSecret);
+          // A missing credential ref used to be skipped silently, so the account
+          // was written with an App ID and no secret and then failed to connect.
+          const ref=credentialRef||'FEISHU_APP_SECRET';
+          let secretSaved=false;
+          if(result.appSecret&&credentialApi){
+            const saved=await credentialApi.set(ref,result.appSecret);
             if(!saved.ok)throw new Error(saved.error?.message||'保存密钥失败');
+            secretSaved=true;
           }
           await scope.call('registrationApply',{appId:result.appId,openId:result.openId||'',domain:result.domain||'',accountId});
-          setRowScan({accountId,status:'done',qr:null,message:'已写入 App ID '+(result.appId||'')+'，账号已开启'});
+          setRowScan({accountId,status:'done',qr:null,
+            message:'已写入 App ID '+(result.appId||'')+(secretSaved?'，密钥已保存（'+ref+'）':'，但未收到密钥，请确认该应用勾选了密钥返回')+'，账号已开启'});
           await refreshAccounts();
           await scope.reload();
         }catch(error){setRowScan({accountId,status:'error',qr:null,message:'写入失败：'+error.message});}
