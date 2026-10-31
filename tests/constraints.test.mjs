@@ -24,6 +24,8 @@ test('the same bot is detected across accounts and refused by name', () => {
 test('the credential name for a new bot is derived from its account id', () => {
   assert.equal(credentialRefFor('bot-2'), 'FEISHU_APP_SECRET_BOT_2');
   assert.equal(credentialRefFor('work-2'), 'FEISHU_APP_SECRET_WORK_2');
+  // The first bot keeps the historical name so an already stored secret is reused.
+  assert.equal(credentialRefFor('default'), 'FEISHU_APP_SECRET');
 });
 
 test('the workspace is derived from the App ID, never typed', () => {
