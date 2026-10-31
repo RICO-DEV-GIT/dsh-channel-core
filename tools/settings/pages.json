@@ -203,7 +203,7 @@
         "group": "会话与输入",
         "label": "工作区路径",
         "type": "text",
-        "help": "未选择角色时生效。留空跟随客户端已登记的默认工作区；填写后使用指定目录。",
+        "help": "自动分配为 G:\\DSWork\\<AppID>（G:\\DSWork 不存在时为插件目录\\DSWork\\<AppID>），一般不需要修改。",
         "advanced": false,
         "when": {
           "rolePreset": ""

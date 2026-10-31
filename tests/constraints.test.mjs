@@ -32,7 +32,7 @@ test('the workspace is derived from the App ID, never typed', () => {
   const withBot = addAccount(base(), { appId: 'cli_new_bot' });
   assert.equal(withBot.workspacePath, joinWorkspace('G:\\DSWork', 'cli_new_bot'));
   assert.equal(withBot.value.accounts[withBot.accountId].workspacePath, withBot.workspacePath);
-  assert.throws(() => addAccount(base(), {}), /工作区由 App ID 决定/);
+  assert.throws(() => addAccount(base(), {}), /App ID 格式不正确/);
   // An identical path is still refused (defence in depth for a hand-edited file).
   const clashing = { ...base().accounts, 'bot-2': { ...base().accounts['bot-2'], workspacePath: 'g:\\a' } };
   assert.equal(assertWorkspaceDisjoint(clashing, 'bot-2').code, 'workspace-overlap');

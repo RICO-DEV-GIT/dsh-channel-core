@@ -58,31 +58,21 @@ test('the credential fields are not rendered twice', () => {
 
 test('first-run health names the settings that make a scan useless', () => {
   // Scanning while the switch is off (or without credentials) used to look like
-  // success; the panel lists what is still missing and fixes it in place. The
-  // workspace has its own always-visible line, so it is not repeated here.
+  // success; the panel lists what is still missing and fixes it in place.
   assert(source.includes('首次使用还差这几项'), 'the health block is discoverable');
   assert(source.includes('已开启「连接渠道」'), 'the switch is checked');
   assert(source.includes('App ID 与密钥已就绪'), 'credentials are checked');
-  assert(source.includes('工作区：'), 'the workspace has its own line');
   assert(source.includes('打开连接渠道'), 'the switch can be fixed in place');
-  assert(source.includes('选择目录…'), 'the workspace can be picked, not typed');
   assert(source.includes('credentialApi.describe([secretRef])'), 'credential state comes from the host, not a guess');
 });
 
-test('the workspace uses the native directory picker with a manual fallback', () => {
-  // A typed path is the easiest way to get it wrong; the desktop bridge opens the
-  // OS dialog, which can also create a folder inside it.
-  assert(source.includes('__DSH_DIRECTORY_PICKER__'), 'it uses the desktop native picker');
-  assert(source.includes('当前客户端不支持系统目录选择'), 'a web-only client explains the fallback');
-  assert(source.includes("'手动填写'"), 'typing stays available behind a toggle');
-});
-
-test('the workspace can be changed at any time, not only when it is missing', () => {
-  // The health block disappears after all three checks pass, which used to remove
-  // the only way to pick a different directory.
-  assert(source.includes('更换目录…'), 'a replace action is offered when a workspace exists');
-  assert(source.includes('dcb-workspace'), 'the line renders outside the health block');
-  assert.equal((source.match(/workspaceLine\(\)/g) ?? []).length, 1, 'the single layout renders it once');
+test('the workspace is assigned, never asked for', () => {
+  // No directory picker, no path input: the folder is G:\DSWork\<appId> and the
+  // bot row simply shows it.
+  assert(!source.includes('__DSH_DIRECTORY_PICKER__'), 'no directory picker is used');
+  assert(!source.includes('directoryCheck'), 'no path validation dialog is offered');
+  assert(!source.includes('工作区：'), 'no workspace input row is rendered');
+  assert(source.includes('row.workspacePath||'), 'the row shows the assigned workspace');
 });
 
 test('the console checklist only appears when it can help', () => {

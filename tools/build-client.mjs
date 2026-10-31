@@ -92,9 +92,6 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     // (switch off, credentials absent, no workspace). Each failing row offers
     // the fix in place instead of waiting for a failure message later.
     const [credentialReady,setCredentialReady]=React.useState(null);
-    const [workspaceDraft,setWorkspaceDraft]=React.useState('');
-    const [manualPath,setManualPath]=React.useState(false);
-    const [missingPath,setMissingPath]=React.useState('');
     React.useEffect(()=>{
       let alive=true;
       if(!credentialApi){setCredentialReady(null);return undefined;}
@@ -111,49 +108,6 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       {key:'enabled',ok:config.enabled===true,label:'已开启「连接渠道」'},
       {key:'credential',ok:!!appId&&credentialReady===true,label:'App ID 与密钥已就绪'},
     ];
-    const enableChannel=async()=>{
-      try{const fresh=await scope.reload();await scope.update({...fresh.value,enabled:true},fresh.revision);await scope.reload();setNotice('已开启连接渠道');}
-      catch(error){setNotice('开启失败：'+error.message);}
-    };
-    const saveWorkspacePath=async value=>{
-      try{const fresh=await scope.reload();await scope.update({...fresh.value,workspacePath:value},fresh.revision);await scope.reload();setNotice('已保存工作区：'+value);setMissingPath('');}
-      catch(error){setNotice('保存失败：'+error.message);}
-    };
-    // A typed path is checked before it is stored: a typo used to surface only
-    // when the first message failed. A missing directory is offered for creation
-    // instead of being saved silently.
-    const saveWorkspace=async()=>{
-      const value=workspaceDraft.trim();
-      if(!value){setNotice('请填写工作区路径，例如 G:\\DSWork');return;}
-      let status;
-      try{status=await scope.call('directoryCheck',{path:value});}
-      catch(error){setNotice('无法检查该路径：'+error.message);return;}
-      if(status&&status.exists&&status.isDirectory===false){setNotice('该路径是文件，不是目录：'+value);return;}
-      if(!status||status.exists!==true){setMissingPath(value);setNotice('目录不存在：'+value);return;}
-      await saveWorkspacePath(value);
-    };
-    const createWorkspace=async()=>{
-      const value=missingPath;
-      if(!value)return;
-      try{await scope.call('directoryCreate',{path:value});}
-      catch(error){setNotice('创建失败：'+error.message);return;}
-      await saveWorkspacePath(value);
-    };
-    // Native directory picker: the desktop bridge opens the OS dialog, which also
-    // allows creating a folder inside it — far safer than typing a path by hand.
-    const pickWorkspace=async()=>{
-      const bridge=globalThis.__DSH_DIRECTORY_PICKER__;
-      if(!bridge||typeof bridge.pick!=='function'){
-        setManualPath(true);
-        setNotice('当前客户端不支持系统目录选择，请手动填写路径。');
-        return;
-      }
-      let picked=null;
-      try{picked=await bridge.pick();}
-      catch(error){setNotice('打开系统目录选择器失败：'+(error&&error.message?error.message:'未知原因'));return;}
-      if(typeof picked!=='string'||!picked)return;
-      await saveWorkspacePath(picked);
-    };
     const healthBlock=()=>{
       if(!health.some(row=>!row.ok))return null;
       return e('div',{className:'dcb-health'},
@@ -164,22 +118,6 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
             ?e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void enableChannel();}},'打开连接渠道')
             :e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void startQuick();}},'快捷配置'))))));
     };
-    // The workspace is not a one-time setting: it must stay replaceable after the
-    // health block disappears (which happens once all three checks pass).
-    const workspaceLine=()=>e('div',{className:'dcb-health dcb-workspace'},
-      e('div',{className:'dcb-health-head'},
-        e('strong',null,'工作区：'+(workspaceValue||'未设置')),
-        e('span',{className:'dcb-health-form'},
-          e('button',{type:'button',className:'dcb-bot-btn',onClick:()=>{void pickWorkspace();}},workspaceValue?'更换目录…':'选择目录…'),
-          e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>setManualPath(v=>!v)},manualPath?'收起':'手动填写'))),
-      manualPath?e('div',{className:'dcb-health-form'},
-        e('input',{type:'text',value:workspaceDraft,placeholder:'例如 G:\\DSWork','aria-label':'工作区路径',
-          onChange:event=>setWorkspaceDraft(event.target.value)}),
-        e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void saveWorkspace();}},'保存'),
-        missingPath?e(React.Fragment,null,
-          e('span',{className:'dcb-reg-err'},'目录不存在'),
-          e('button',{type:'button',className:'dcb-bot-btn',onClick:()=>{void createWorkspace();}},'创建并保存'),
-          e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{setMissingPath('');setNotice('');}},'取消')):null):null);
     // ---- multi-account management -------------------------------------------------
     const [accounts,setAccounts]=React.useState(null);
     const [accountBusy,setAccountBusy]=React.useState('');
@@ -209,9 +147,6 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       if(!bootedSelection.current){bootedSelection.current=true;prevSelected.current=selected;return;}
       if(prevSelected.current===selected)return;
       prevSelected.current=selected;
-      setWorkspaceDraft('');
-      setManualPath(false);
-      setMissingPath('');
       setNotice('');
       // A scan in progress is not tied to any account yet; switching the editor
       // must not leave a QR that the operator thinks belongs to the new selection.
@@ -426,7 +361,6 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       head('飞书机器人','「+ 添加机器人」：先为它选择独立的工作区，再用手机飞书扫码。每个机器人独立工作区、独立会话，可以同时在线；不再需要时点该行的「删除」。'),
       accountPicker(),
       healthBlock(),
-      workspaceLine(),
       accountsBlock(),
       noticeLine(),
       checklistBlock());
