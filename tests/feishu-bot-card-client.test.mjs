@@ -31,7 +31,9 @@ test('there is only add and delete: no replace, no switch, no persistent QR', ()
   assert(source.includes('确认删除'), 'deletion needs a second click');
   assert(source.includes('accountCreate'), 'adding creates the row through the account RPC');
   assert(source.includes('accountRemove'), 'deleting goes through the account RPC');
-  assert(source.includes('rowPoll'), 'the scan polls the device code for that row');
+  assert(source.includes('addPoll'), 'the scan polls its own device code');
+  assert(source.includes('pendingWorkspace'), 'the row is created only after the phone confirms');
+  assert(source.includes('添加失败'), 'a failed add rolls back');
   assert(!source.includes('saveManual'), 'the manual credential form is gone');
   assert(!source.includes("id:'dcb-bot-secret'"), 'no secret input is rendered');
 });
@@ -97,14 +99,16 @@ test('the bot list offers only add and delete', () => {
   assert(!source.includes("row.appId?null:e('button'"), 'no row-level add-bot button remains');
 });
 
-test('the server refuses a duplicate bot and a silent replacement', () => {
-  // Both rules live in the RPC layer; read the source because instantiating the
+test('the server enforces the hard constraints', () => {
+  // These rules live in the RPC layer; read the source because instantiating the
   // service needs the whole Host.
   const remote = fs.readFileSync(path.join(root, 'lib/channel-plugin-settings/remote-config.js'), 'utf8');
-  assert(remote.includes('该机器人已经存在'), 'the same app cannot be added twice');
-  assert(remote.includes("account.appId) === String(appId)"), 'duplicate detection compares the app id');
-  assert(remote.includes("plugin-config/account-bound"), 'an already bound account refuses a different bot');
-  assert(remote.includes('assertWorkspaceDisjoint'), 'binding validates the workspace too');
+  assert(remote.includes('该机器人已经存在'), 'C4: the same app cannot be added twice');
+  assert(remote.includes('accountOwningBot'), 'C4: duplicate detection uses the shared helper');
+  assert(remote.includes('plugin-config/account-bound'), 'C5: a bound account refuses a different bot');
+  assert(!remote.includes('replace !== true'), 'C5: there is no replace escape hatch');
+  assert(remote.includes('assertWorkspaceDisjoint'), 'C2/C6: binding and saving both validate the workspace');
+  assert(remote.includes('this.assertWorkspace(value ?? {}, id)'), 'C6: saving the form is validated too');
 });
 
 test('a failing connection shows the console checklist', () => {
