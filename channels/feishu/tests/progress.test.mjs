@@ -141,7 +141,7 @@ test('legacy boolean is read/normalized/saved/reloaded using the actual ConfigFi
 
 test('final Feishu presentation keeps collapsed draft card separate from answer card',async()=>{
  const {draftCard,finalCards}=await import('../transport.js');
- const streaming=schema.validate({streaming:{mode:'progress',progress:{narration:true}}}).streaming;
+ const streaming=schema.validate({streaming:{mode:'progress',progress:{narration:true},finalFormat:'card'}}).streaming;
  const body={final:true,status:'completed',drafts:['草稿一','草稿二'],text:'完整正文'};
  const folded=draftCard(body),answers=finalCards(body,streaming);
  assert.equal(folded.body.elements.length,1);
@@ -164,7 +164,7 @@ test('final Feishu presentation keeps collapsed draft card separate from answer 
 });
 
 test('two Feishu cards reuse the progress card and retain the complete long final answer',async()=>{
- const streaming=schema.validate({streaming:{mode:'progress',progress:{narration:true}}}).streaming;
+ const streaming=schema.validate({streaming:{mode:'progress',progress:{narration:true},finalFormat:'card'}}).streaming;
  const f=fixture(streaming),t=await f.create();
  try{
   const dm={...origin,kind:'dm'};
@@ -213,7 +213,7 @@ test('final reasoning card keeps chronological independent thoughts but omits re
 
 test('when reasoning entirely repeats the answer, Feishu reuses progress card for final instead of sending duplicate card',async()=>{
  const repeating='执行结束，三个工具均已成功完成，当前工作区检查正常。';
- const streaming=schema.validate({streaming:{mode:'progress',progress:{narration:true}}}).streaming;
+ const streaming=schema.validate({streaming:{mode:'progress',progress:{narration:true},finalFormat:'card'}}).streaming;
  const f=fixture(streaming),t=await f.create();
  try{
    await t.progress({...origin,kind:'dm'},{sessionId:'session',status:'thinking'});
@@ -272,7 +272,7 @@ test('Feishu footer settings accept partial migration and reject unknown/incorre
 });
 
 test('Feishu sends the final answer before attempting to collapse the previous progress card',async()=>{
- const streaming=schema.validate({streaming:{progress:{narration:true}}}).streaming;
+ const streaming=schema.validate({streaming:{progress:{narration:true},finalFormat:'card'}}).streaming;
  const f=fixture(streaming),t=await f.create();
  try{
    const dm={...origin,kind:'dm'};
@@ -285,7 +285,7 @@ test('Feishu sends the final answer before attempting to collapse the previous p
 });
 
 test('Feishu final answer survives failure to update the retained reasoning card',async()=>{
- const streaming=schema.validate({streaming:{progress:{narration:true}}}).streaming;
+ const streaming=schema.validate({streaming:{progress:{narration:true},finalFormat:'card'}}).streaming;
  const f=fixture(streaming,{failUpdate:500}),t=await f.create();
  try{
    const dm={...origin,kind:'dm'};
@@ -298,7 +298,7 @@ test('Feishu final answer survives failure to update the retained reasoning card
 });
 
 test('Feishu without a preceding progress message never adds a trailing thinking card after the answer',async()=>{
- const streaming=schema.validate({streaming:{progress:{narration:true}}}).streaming;
+ const streaming=schema.validate({streaming:{progress:{narration:true},finalFormat:'card'}}).streaming;
  const f=fixture(streaming),t=await f.create();
  try{
    await t.send({...origin,kind:'dm'},{status:'completed',text:'快速答复',drafts:['独立的思考片段：提前完成快速检查。']});
@@ -308,7 +308,7 @@ test('Feishu without a preceding progress message never adds a trailing thinking
 });
 
 test('deleted old progress is not recreated as a trailing thought card after the final answer',async()=>{
- const streaming=schema.validate({streaming:{progress:{narration:true}}}).streaming;
+ const streaming=schema.validate({streaming:{progress:{narration:true},finalFormat:'card'}}).streaming;
  const f=fixture(streaming,{failUpdate:404}),t=await f.create();
  try{
    const dm={...origin,kind:'dm'};
@@ -391,7 +391,7 @@ test('CardKit uses streaming element updates, monotonic sequences and finalizes 
 });
 
 test('CardKit sends the final answer before replacing the progress card with filtered reasoning',async()=>{
- const kit=fakeCardKit(),f=fixture({mode:'progress',progress:{narration:true}},{rawClient:kit.rawClient}),t=await f.create();
+ const kit=fakeCardKit(),f=fixture({mode:'progress',progress:{narration:true},finalFormat:'card'},{rawClient:kit.rawClient}),t=await f.create();
  try{
   const dm={...origin,kind:'dm'};
   await t.progress(dm,{status:'thinking',activity:{timeline:[{type:'draft',text:'独立的调查思路'}]}});
@@ -530,12 +530,12 @@ test('Feishu draft and thinking switches are independent in progress and final c
   {type:'draft',text:'仅主人能看到的推理'},
   {type:'public-draft',text:'已公开的阶段性草稿'}
  ],activeTextDraft:'仍在输出的临时正文'}};
- const withoutThinking=schema.validate({streaming:{progress:{narration:false,draft:true,commentary:false}}}).streaming;
+ const withoutThinking=schema.validate({streaming:{progress:{narration:false,draft:true,commentary:false},finalFormat:'card'}}).streaming;
  const visible=card(preview,[],withoutThinking).body.elements[0].content;
  assert(visible.includes('📝 已公开的阶段性草稿'));
  assert(visible.includes('📝 仍在输出的临时正文'));
  assert(!visible.includes('仅主人能看到的推理'));
- const withoutDraft=schema.validate({streaming:{progress:{narration:true,draft:false,commentary:false}}}).streaming;
+ const withoutDraft=schema.validate({streaming:{progress:{narration:true,draft:false,commentary:false},finalFormat:'card'}}).streaming;
  const hidden=card(preview,[],withoutDraft).body.elements[0].content;
  assert(hidden.includes('💭 仅主人能看到的推理'));
  assert(!hidden.includes('已公开的阶段性草稿'));
@@ -555,7 +555,7 @@ test('Feishu draft and thinking switches are independent in progress and final c
 });
 
 test('Feishu Ask User preserves committed context and creates an independent interactive card',async()=>{
- const f=fixture({mode:'progress',cardEngine:'patch'}),t=await f.create();
+ const f=fixture({mode:'progress',cardEngine:'patch',finalFormat:'card'}),t=await f.create();
  try{
   const dm={...origin,kind:'dm'};
   await t.progress(dm,{status:'generating',activity:{timeline:[{type:'public-draft',text:'分析完成，等待确认。'}]}});

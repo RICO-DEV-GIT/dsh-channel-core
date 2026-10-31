@@ -1,14 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
 import https from 'node:https';
 import net from 'node:net';
 import { createRequire } from 'node:module';
 import { once } from 'node:events';
+import { fileURLToPath } from 'node:url';
 import { windowsProxy,resolveNetwork,configureRuntimeNetwork } from '../lib/runtime-network.js';
-const { WebSocket, WebSocketServer } = createRequire('E:/dsh/home/profiles/desktop/package.json')('ws');
+// Test-only dependency resolution: resolve `ws` from this checkout instead of a
+// machine-specific DSH profile path so the suite runs on any machine.
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const { WebSocket, WebSocketServer } = createRequire(path.join(root,'package.json'))('ws');
 
 test('Windows proxy parsing obeys the enable switch and supports per-protocol settings',()=>{
  assert.equal(windowsProxy('ProxyEnable REG_DWORD 0x1\r\nProxyServer REG_SZ 127.0.0.1:10808'),'http://127.0.0.1:10808/');
@@ -30,18 +36,26 @@ test('runtime configuration applies public Node proxy support to fetch and HTTP 
  // this fixture without contacting an external host.
  proxy.on('connect',(request,client,head)=>{assert.equal(request.url,'discord-network-fixture.invalid:80');const upstream=net.connect(proxy.address().port,'127.0.0.1',()=>{client.write('HTTP/1.1 200 Connection Established\r\n\r\n');if(head.length)upstream.write(head);client.pipe(upstream).pipe(client);});for(const socket of [client,upstream]){sockets.add(socket);socket.on('close',()=>sockets.delete(socket));}upstream.on('error',()=>client.destroy());client.on('error',()=>upstream.destroy());});
  proxy.listen(0,'127.0.0.1');local.listen(0,'127.0.0.1');await Promise.all([once(proxy,'listening'),once(local,'listening')]);
- const directory=await fs.mkdtemp(path.resolve('E:/dsh/cache/temp/network-'));
+ const directory=await fs.mkdtemp(path.join(os.tmpdir(),'dsh-network-'));
  let network;
  try{
   await fs.writeFile(path.join(directory,'config.json'),JSON.stringify({network:{proxyMode:'custom',proxyUrl:'http://127.0.0.1:'+proxy.address().port}}));
   network=await configureRuntimeNetwork(directory,{env:{}});assert.equal(network.source,'custom');
   const response=await fetch('http://discord-network-fixture.invalid/test',{signal:AbortSignal.timeout(5000)});assert.equal(await response.text(),'proxy:http://discord-network-fixture.invalid/test');
-  const httpText=await new Promise((resolve,reject)=>{http.get('http://discord-network-fixture.invalid/sdk',response=>{let text='';response.on('data',chunk=>text+=chunk);response.on('end',()=>resolve(text));}).on('error',reject);});assert.equal(httpText,'proxy:http://discord-network-fixture.invalid/sdk');
+  const httpText=await new Promise((resolve,reject)=>{const request=http.get('http://discord-network-fixture.invalid/sdk',{timeout:5000},response=>{let text='';response.on('data',chunk=>text+=chunk);response.on('end',()=>resolve(text));});request.on('timeout',()=>request.destroy(new Error('http get timed out')));request.on('error',reject);});assert.equal(httpText,'proxy:http://discord-network-fixture.invalid/sdk');
   const direct=await fetch('http://127.0.0.1:'+local.address().port,{signal:AbortSignal.timeout(5000)});assert.equal(await direct.text(),'direct');
- }finally{network?.restore();for(const socket of sockets)socket.destroy();proxy.closeAllConnections();local.closeAllConnections();await Promise.all([new Promise(resolve=>proxy.close(resolve)),new Promise(resolve=>local.close(resolve))]);const parent=await fs.realpath('E:/dsh/cache/temp');assert((await fs.realpath(directory)).startsWith(parent+path.sep));await fs.rm(directory,{recursive:true});}
+ }finally{network?.restore();for(const socket of sockets)socket.destroy();proxy.closeAllConnections();local.closeAllConnections();await Promise.all([new Promise(resolve=>proxy.close(resolve)),new Promise(resolve=>local.close(resolve))]);const parent=await fs.realpath(os.tmpdir());assert((await fs.realpath(directory)).startsWith(parent+path.sep));await fs.rm(directory,{recursive:true});}
 });
 
-test('SDK WSS uses CONNECT with verified TLS and SNI; loopback bypasses the proxy and cleanup restores globals',async()=>{
+test('SDK WSS uses CONNECT with verified TLS and SNI; loopback bypasses the proxy and cleanup restores globals',async t=>{
+ // The TLS fixtures are test-only PEM files and `*.pem` is gitignored, so a fresh
+ // checkout never has them. Skip with a clear reason instead of failing on ENOENT:
+ // generate tests/fixtures/test-only-{cert,key}.pem (see the WSS test note) to run it.
+ if(!existsSync(fileURLToPath(new URL('./fixtures/test-only-cert.pem',import.meta.url)))
+   ||!existsSync(fileURLToPath(new URL('./fixtures/test-only-key.pem',import.meta.url)))){
+  t.skip('TLS test fixtures missing (tests/fixtures/test-only-{cert,key}.pem are gitignored)');
+  return;
+ }
  const cert=await fs.readFile(new URL('./fixtures/test-only-cert.pem',import.meta.url)),key=await fs.readFile(new URL('./fixtures/test-only-key.pem',import.meta.url));
  const secure=https.createServer({cert,key}),gateway=new WebSocketServer({server:secure});
  gateway.on('connection',socket=>socket.send('hello'));
@@ -53,7 +67,7 @@ test('SDK WSS uses CONNECT with verified TLS and SNI; loopback bypasses the prox
   sockets.add(upstream);upstream.on('close',()=>sockets.delete(upstream));upstream.on('error',()=>client.destroy());client.on('error',()=>upstream.destroy());
  });
  proxy.listen(0,'127.0.0.1');await once(proxy,'listening');
- const directory=await fs.mkdtemp(path.resolve('E:/dsh/cache/temp/wss-'));
+ const directory=await fs.mkdtemp(path.join(os.tmpdir(),'dsh-wss-'));
  const before=[http.get,http.request,http.globalAgent,https.get,https.request,https.globalAgent];let network;
  async function connect(url,options={}){const socket=new WebSocket(url,{ca:cert,handshakeTimeout:5000,...options});try{const [message]=await once(socket,'message',{signal:AbortSignal.timeout(7000)});assert.equal(message.toString(),'hello');}finally{socket.terminate();}}
  try{
@@ -62,5 +76,5 @@ test('SDK WSS uses CONNECT with verified TLS and SNI; loopback bypasses the prox
   await connect('wss://discord-network-fixture.invalid:'+secure.address().port);assert.deepEqual(tunnels,['discord-network-fixture.invalid:'+secure.address().port]);
   await connect('wss://localhost:'+secure.address().port,{family:4});assert.equal(tunnels.length,1);
   network.restore();network.restore();assert.deepEqual([http.get,http.request,http.globalAgent,https.get,https.request,https.globalAgent],before);
- }finally{network?.restore();for(const socket of gateway.clients)socket.terminate();for(const socket of sockets)socket.destroy();await Promise.all([new Promise(resolve=>gateway.close(resolve)),new Promise(resolve=>secure.close(resolve)),new Promise(resolve=>proxy.close(resolve))]);const parent=await fs.realpath('E:/dsh/cache/temp');assert((await fs.realpath(directory)).startsWith(parent+path.sep));await fs.rm(directory,{recursive:true});}
+ }finally{network?.restore();for(const socket of gateway.clients)socket.terminate();for(const socket of sockets)socket.destroy();await Promise.all([new Promise(resolve=>gateway.close(resolve)),new Promise(resolve=>secure.close(resolve)),new Promise(resolve=>proxy.close(resolve))]);const parent=await fs.realpath(os.tmpdir());assert((await fs.realpath(directory)).startsWith(parent+path.sep));await fs.rm(directory,{recursive:true});}
 });

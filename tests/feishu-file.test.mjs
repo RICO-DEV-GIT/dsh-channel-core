@@ -41,9 +41,20 @@ test('file requests reject directory traversal, symlink escape, forbidden types,
   assert.throws(()=>validateWorkspaceFile(large,f.root),{code:'outbound-file-size-invalid'});
   const outside=path.join(external,'secret.txt');fs.writeFileSync(outside,'secrets');
   assert.throws(()=>validateWorkspaceFile(outside,f.root),{code:'outbound-file-outside-workspace'});
+  // A Windows file symlink needs SeCreateSymbolicLinkPrivilege (admin or
+  // Developer Mode). A directory junction needs no privilege and `realpath`
+  // follows it identically, so the escape check is still exercised everywhere.
+  const outsideDir=path.join(external,'linked');
+  fs.mkdirSync(outsideDir);
+  fs.writeFileSync(path.join(outsideDir,'secret.txt'),'secrets');
+  const dirLink=path.join(f.root,'_scratch','linked');
+  fs.symlinkSync(outsideDir,dirLink,'junction');
+  assert.throws(()=>validateWorkspaceFile(path.join(dirLink,'secret.txt'),f.root),{code:'outbound-file-outside-workspace'});
+  // Where the platform does grant the privilege, also cover a plain file symlink.
   const link=path.join(f.root,'_scratch','indirect.txt');
-  fs.symlinkSync(outside,link);
-  assert.throws(()=>validateWorkspaceFile(link,f.root),{code:'outbound-file-outside-workspace'});
+  try{fs.symlinkSync(outside,link);}
+  catch(error){if(!['EPERM','EACCES','ENOTSUP','UNKNOWN'].includes(error.code))throw error;}
+  if(fs.existsSync(link))assert.throws(()=>validateWorkspaceFile(link,f.root),{code:'outbound-file-outside-workspace'});
  }finally{f.cleanup();fs.rmSync(external,{recursive:true,force:true});}
 });
 test('existing image path is unaffected by common-media refactor',()=>{

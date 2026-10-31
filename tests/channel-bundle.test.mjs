@@ -76,10 +76,18 @@ test('Discord and Feishu align functional groups and keep infrequent settings in
  const pages=JSON.parse(match[1]);
  const groups=['账号与连接','接收与权限','会话与输入','回复与显示','主人与记忆','附件与传输'];
  const folds={'账号与连接':'更多连接设置','会话与输入':'更多会话设置','回复与显示':'更多显示设置','主人与记忆':'更多身份与记忆设置'};
- const shared=['enabled','credentialSecret','allowedUsers','allowGroups','allowedGroups','requireMention','rolePreset','inputMode','streaming.mode','streaming.progress.toolProgress','streaming.progress.commentary','streaming.progress.toolDetail','streaming.progress.narration','throttleMs','streaming.progress.maxLines','streaming.progress.maxLineChars','ownerMode','ownerUserId','ownerStatus','memoryNamespace','identityLinks','attachments','maxAttachmentMB'];
+ const shared=['enabled','allowedUsers','allowGroups','allowedGroups','requireMention','rolePreset','inputMode','streaming.mode','streaming.progress.toolProgress','streaming.progress.commentary','streaming.progress.toolDetail','streaming.progress.narration','throttleMs','streaming.progress.maxLines','streaming.progress.maxLineChars','ownerMode','ownerUserId','ownerStatus','memoryNamespace','identityLinks','attachments','maxAttachmentMB'];
  for(const provider of ['discord','feishu']){
   const fields=pages[provider].fields,byKey=new Map(fields.map(field=>[field.key,field]));
-  assert.equal(fields.length,provider==='discord'?41:40,'all config fields remain available');
+  // Feishu drops appId + the credential field from the form: the bot panel owns
+  // both, so a second rendered copy would let the two disagree.
+  assert.equal(fields.length,provider==='discord'?41:39,'all config fields remain available');
+  if(provider==='feishu'){
+    assert(!byKey.has('appId'),'the Feishu form must not render a second App ID input');
+    assert(!byKey.has('credentialSecret'),'the Feishu form must not render a second secret input');
+    assert.equal(pages[provider].credentialFields,undefined,'no separate credential block either');
+  }
+  for(const key of shared)assert(byKey.has(key)||provider==='feishu','shared fields stay available: '+key);
   if(provider==='discord'){
     assert(!byKey.has('streaming.style'),'removed message style must not be configurable');
     assert.equal(byKey.get('displayIcon').group,'回复与显示');
@@ -123,10 +131,18 @@ test('Discord and Feishu align functional groups and keep infrequent settings in
     assert.equal(byKey.get('streaming.progress.draftMaxChars').max,1000);
     assert.equal(byKey.get('streaming.cardEngine').type,'select');
     assert(byKey.get('streaming.cardEngine').options.some(option=>option[0]==='cardkit'));
+    assert.equal(byKey.get('streaming.finalFormat').group,'回复与显示');
+    assert.equal(byKey.get('streaming.finalFormat').type,'select');
+    assert.deepEqual(byKey.get('streaming.finalFormat').options.map(option=>option[0]),['auto','card','text']);
+    assert.match(byKey.get('streaming.finalFormat').options.find(option=>option[0]==='auto')[1],/私聊/);
+    assert.match(byKey.get('streaming.finalFormat').help,/复制/);
   }
   assert.equal(byKey.size,fields.length,'field names are unique');
   assert(fields.every(field=>field.advanced===false),'channel pages must not render a second global advanced settings area');
-  assert.deepEqual(fields.slice(0,3).map(field=>field.key),['enabled',provider==='discord'?'applicationId':'appId','credentialSecret']);
+  // Feishu keeps the credential inputs in the bot panel, so its form opens with
+  // the switch only; Discord still renders its token field in the form.
+  const head=provider==='discord'?['enabled','applicationId','credentialSecret']:['enabled'];
+  assert.deepEqual(fields.slice(0,head.length).map(field=>field.key),head);
   assert.deepEqual(fields.filter(field=>shared.includes(field.key)).map(field=>field.key),shared);
   assert.deepEqual(fields.map(field=>field.group).filter((name,index,list)=>index===0||name!==list[index-1]),groups);
   for(const field of fields){
@@ -141,11 +157,11 @@ test('Discord and Feishu align functional groups and keep infrequent settings in
    assert.equal(byKey.get(key).fold,'更多显示设置');
   assert.equal(byKey.get('memoryNamespace').group,'主人与记忆');
   assert.equal(byKey.get('identityLinks').group,'主人与记忆');
-  assert.equal(byKey.get('credentialSecret').type,'credential');
+  if(provider==='discord')assert.equal(byKey.get('credentialSecret').type,'credential');
   assert(!fields.some(field=>field.type==='password'),'credentials stay in the protected DSH store');
  }
  assert.equal(pages.discord.fields.find(x=>x.key==='applicationId').type,'readonly');
- assert.equal(pages.feishu.fields.find(x=>x.key==='appId').type,'text');
+ assert(!pages.feishu.fields.some(x=>x.key==='appId'),'the Feishu form leaves App ID to the bot panel');
  assert(source.includes("className:'dpc-fold'"),'folded controls render inside their group');
  assert(source.includes("editor.draft&&fields.some(spec=>spec.advanced"),'legacy shared renderer still supports other plugins');
  assert(source.includes("embeddedCredentials=fields.some(spec=>spec.type==='credential')"),'credential control is embedded rather than duplicated');

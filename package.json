@@ -1,6 +1,6 @@
 {
   "name": "dsh-channel-core",
-  "version": "0.6.3",
+  "version": "0.8.0",
   "private": true,
   "type": "module",
   "description": "统一管理 Discord、飞书渠道、会话绑定、消息交付与进度卡片的单插件。",
@@ -29,6 +29,9 @@
     "locale/",
     "cordis.patch.yml",
     "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
     "config.example.json"
   ],
   "dsh": {
@@ -70,7 +73,8 @@
   "dependencies": {
     "global-agent": "3.0.0",
     "discord.js": "14.27.0",
-    "@larksuiteoapi/node-sdk": "1.74.0"
+    "@larksuiteoapi/node-sdk": "1.74.0",
+    "qrcode": "1.5.4"
   },
   "dshCompatibility": {
     "testedRuntime": "0.2.1-rc.2",

@@ -18,7 +18,34 @@ function fixture(extra={},configFile) {
   const runtime=new ChannelRuntime(ctx,settings,{provider:'discord',credentialRefs:()=>['DISCORD_BOT_TOKEN'],createTransport:async args=>{transportArgs=args;return{start:async()=>{starts++;},close:async()=>{},details:()=>({applicationId:'application-fixture'})};}});
   return{runtime,ctx,calls,records,settings,get starts(){return starts;},get transportArgs(){return transportArgs;}};
 }
+
 const group={kind:'group',userId:'any-member',conversationId:'any-channel',text:'hello',resources:[],mentionedBot:false};
+
+test('a handshake that never settles is reported as a timeout instead of hanging',async t=>{
+  // Deterministic timers: a real clock made this test sensitive to a loaded box.
+  t.mock.timers.enable({apis:['setTimeout'],now:0});
+  const config={enabled:true,allowedUsers:[],allowedGroups:[],allowGroups:true,requireMention:false,accountId:'test',identityLinks:[],agentPreset:'',rolePreset:'',workspacePath:'E:\\dsh\\w',memoryNamespace:'private',inputMode:'inherit'};
+  const ctx={get:()=>undefined,on(){return()=>{};},credentials:{async resolve(){return{value:'fixture'};}},channelCore:{resolveWorkspace:async()=>'E:\\dsh\\w',resolveSessionWorkspace:async()=>({cwd:'E:\\dsh\\w',agentPreset:''}),networkReady:Promise.resolve(),store:{syncAliases(){},setOwner(){}},bridge:{register(){return()=>{};}}}};
+  const settings={configFile:{value:config,subscribe(){return()=>{};}}};
+  const runtime=new ChannelRuntime(ctx,settings,{provider:'discord',credentialRefs:()=>['DISCORD_BOT_TOKEN'],
+    // A handshake that only settles when the runtime aborts it: exactly the
+    // stuck connect the watchdog exists for.
+    createTransport:async args=>new Promise((_resolve,reject)=>{
+      args.signal.addEventListener('abort',()=>reject(Object.assign(new Error('aborted'),{code:'aborted'})),{once:true});
+    })});
+  runtime.connectTimeoutMs=1000;
+  try{
+    const connecting=runtime.reconfigure();
+    // Let the async chain reach the point where the watchdog is armed; the
+    // mocked clock only advances when asked, so this cannot race.
+    for(let i=0;i<50&&!runtime.abort;i++)await new Promise(resolve=>setImmediate(resolve));
+    assert(runtime.abort,'the connect attempt armed its abort controller');
+    t.mock.timers.tick(1000);
+    assert.match(runtime.message,/连接超时/,'the status explains the stall instead of staying on 正在连接');
+    await connecting;
+  }finally{await runtime.close().catch(()=>{});}
+});
+
 
 test('card-level notices never raise a channel status error',async()=>{
  const f=fixture();

@@ -86,6 +86,31 @@ The Session-scoped `channel_send` model tool supports `{imagePath:"..."}` for a 
 
 Feishu CardKit final replies retry closing/updating **the same existing card** once when the initial terminal edit fails. The delivery ledger keeps ambiguous failures as `uncertain` rather than blindly sending a duplicate, and `channel.final-delivered` / `channel.final-delivery-failed` diagnostics make stuck progress easier to investigate.
 
+**Final reply format.** `streaming.finalFormat` decides how a finished answer is delivered. The default `auto` keeps the card in a group — several people read it there and the card's structure helps — and sends a private chat the answer as an ordinary text message: on a phone a long card has to be opened before its text can be selected, which is what makes copying hard, while a chat message is long-pressed and copied directly. `card` and `text` force one format for every conversation. A text delivery recalls the live progress card first, so the answer never sits under a card that still says it is working; when Feishu no longer allows the recall, the stale card simply stays behind.
+
+## Adding the bot by QR code
+
+The Feishu settings page starts with **Scan to add the bot**: pressing *Generate QR code* renders a QR that opens a direct chat with **the bot this DSH profile is currently connected to**. The QR encodes the `open_id` that the live connection resolved through `bot/v3/info`, so it points at that bot only and never carries the `appId`, `appSecret`, or a tenant token.
+
+- While the channel is disconnected no QR is produced; the button reports "connect first", and a changed credential or bot changes the QR instead of leaving a stale one.
+- Scanning grants no reach by itself: DMs still obey `ownerMode` and the allowed-user list, groups still obey the group rules, and first-DM owner claim behaves exactly as before.
+- The scan only opens a DM; messages then flow into the usual DSH Session. *Copy link* is there for phones without a camera.
+- The section calls the channel's own `botCard` RPC, is not rendered on the Discord tab, and never reads or writes another channel's settings.
+
+## Creating or connecting a bot by QR code
+
+Below the card, the Feishu settings page offers **Scan to create/connect a bot**. When you have no bot yet, press *Generate QR code* and scan it with the Feishu app; choosing *Create a new app* on the phone makes the plugin write the returned App ID into the channel config, save the App Secret through the standard credential API, and — on a config that is still at defaults — claim the scanner as the owner (an existing config only appends the scanner to the allowed users, leaving ownership and routing untouched).
+
+- The flow drives Feishu's official device-code registration endpoint (`accounts.feishu.cn` / `accounts.larksuite.com` `/oauth/v1/app/registration`): `begin` returns the QR, `poll` returns the outcome. The endpoint is official but not part of the public open-apis suite; if Feishu changes it, only this flow degrades and manual entry keeps working.
+- Choosing an *existing* app on the phone makes Feishu show copy buttons instead of handing the secret back to the client; the card then points you at the regular 「飞书应用密钥」 input below. The device code is never rendered in the page.
+- Scan-to-create changes no receive scope: DMs and groups still obey the existing allow rules and owner checks.
+
+## Workspace and preset hints
+
+- Leaving the workspace path empty follows the default workspace registered in the client; filling it requires an existing directory, and a connect failure now says exactly that instead of a raw code.
+- The Agent preset id is a picker: its options are the presets the Host declares, plus 「留空 (follow the default: standard)」. A saved id the Host lacks stays visible as a「本机不存在，会自动回退默认」option instead of disappearing; a Host without the preset registry falls back to a plain text field.
+- Connect and receive failures no longer show only the raw error code: the operator-fixable ones (workspace, preset, role, binding conflicts…) carry a Chinese instruction on what to change, with the original code kept in parentheses for support.
+
 ## Native Session scheduling and outbound records
 
 The global `channel_send` tool only delivers messages; it does not offer news history tools, outbound archive queries, or news system prompt injection. A private transport ledger retains delivery state, remote IDs and idempotency keys to avoid duplicates.

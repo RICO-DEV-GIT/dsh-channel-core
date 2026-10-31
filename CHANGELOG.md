@@ -2,6 +2,48 @@
 
 This file holds historical behavior notes formerly embedded in README. For current setup and behavior, start with [README.md](README.md) or [简体中文](README.zh-CN.md).
 
+## 0.7.5
+
+- The Feishu page now has **one** bot entry instead of two. `FeishuBotCard` and `FeishuRegistrationCard` are merged into `FeishuBotPanel`, which picks its state from the channel instead of asking the operator to guess which QR to press:
+  - **not configured** → one「生成二维码」button (Feishu device-code flow: choose 新建应用 to write App ID / secret / owner automatically), plus an inline「已有 App ID？直接填」form that writes App ID and secret in a single action — no scanning needed;
+  - **configured but disconnected** → shows the configured App ID and offers「重新连接」, keeping the same inline form for a wrong credential;
+  - **connected** → the bot's chat QR (scan → open the DM) with 复制链接 / 刷新二维码, and the security note that the QR carries only the public `open_id`.
+- Note: Feishu does not return an existing app's secret through the scan flow, so the inline form is the only way to enter one — a platform limit, not a missing feature.
+
+## 0.7.4
+
+- Fixed the Feishu **scan-to-add QR** never rendering: the card asked the Channel SDK for `getBotIdentity()`, which the shipped `LarkChannel` does not expose (it only has `setBotIdentity()` and the async `fetchBotIdentity()`), so the lookup was always `undefined` and the page showed「连接成功后即可生成名片」forever. The card now calls `fetchBotIdentity()` (`GET /open-apis/bot/v3/info`) once and caches the identity for the life of the transport.
+- Fixed `buildBotCard`'s cache hit dropping `openId`: a second request for the same bot answered without the id, which the deployment page renders as a nameless card.
+- New `channels/feishu/tests/bot-card-identity.test.mjs` pins all three cases: no getter → QR from `fetchBotIdentity`, failed lookup → `null` instead of a throw, and a late-resolving identity working on a later call.
+
+## 0.7.3
+
+- Added `streaming.finalFormat` with three values: `auto` (default), `card`, `text`. `auto` sends a private chat's final answer as an ordinary text message — a chat bubble can be long-pressed and its text selected on a phone, while a long card has to be opened first — and keeps the card in groups, where the answer is read by several people and the structure helps. `card` and `text` force one format everywhere, so an existing channel can opt back into the old behaviour. A text delivery recalls the live progress card before sending, and an answer that is empty still fails loudly (`feishu-final-text-empty`) instead of sending a blank message.
+- Feishu tests that cover the card pipeline now state `finalFormat: 'card'` explicitly, and two new tests pin the `auto` split: private chat → text, group → card.
+- 「Agent 预设 ID」is now a picker (`type: 'preset'`) instead of free text. It lists the presets the Host declares, offers「留空（跟随默认：standard）」, and keeps a saved id the Host does not have as a visible「本机不存在，会自动回退默认」option rather than dropping it. A Host without the preset registry falls back to a plain text field.
+- The page-level warning became a warning only: it renders just when the saved id cannot work, since the picker already lists the choices.
+
+## 0.7.2
+
+- Fixed the shipped channel config naming a nonexistent Agent preset (`agentPreset:'agent'`). Every inbound message failed at session creation with `agent-preset/not-found`. The default is now empty, which means "follow the Host default preset"; a saved id this Host does not declare is detected at session time and replaced by the Host default instead of failing, and the status line says so.
+- Added a preset hint to both channel pages: the settings page reads the presets the Host actually declares (`presetCatalog` RPC) and lists them above the form, marking a configured id that does not exist in red with the fix ("change it to one of these or leave it blank"). The「Agent 预设 ID」field help says the same.
+- Failures now explain themselves instead of printing a raw code. `lib/channel-hints.js` maps the operator-fixable codes (workspace required/invalid, unknown preset, role unavailable, scope mismatch, binding review, receipt conflict, uncertain input, aborted input…) to an instruction plus the original code, and both the channel status line and the failure card use it. An unknown code keeps the previous advice with the code appended.
+- Tests: preset catalog/fallback and hint mapping are covered, and the client bundle keeps asserting the rendered hint.
+
+## 0.7.1
+
+- Added **scan to create/connect a Feishu bot** on the Feishu settings page. The Host drives Feishu's official device-code registration endpoint (`accounts.feishu.cn`/`larksuite.com` `/oauth/v1/app/registration`): `begin` renders a QR of the verification page, `poll` follows the scan outcome. A freshly created bot is written into the channel config automatically (App ID always; the operator's `open_id` becomes the owner on a fresh config, or is appended to the allowlist on an existing one) and its App Secret is saved through the standard credential API. Choosing an existing app on the phone ends with Feishu showing copy buttons, so the card then points the operator at the regular secret input — the flow never sees the secret in that path.
+- New `registrationBegin` / `registrationPoll` / `registrationApply` RPCs on the plugin settings service, delegated to a channel-supplied registration source. Only Feishu provides one; the Discord tab renders exactly as before, and the device code is never shown in the page.
+- The registration module is standalone (`lib/feishu-app-registration.js`) with an injectable fetch, so the endpoint contract is unit-tested offline; `registrationApplyConfig` is a conservative merge that never clobbers an operator-configured bot.
+- Note: the accounts endpoint is official but not part of the public open-apis suite; if Feishu changes it, only this flow degrades (manual paste remains).
+
+## 0.7.0
+
+- Added **scan to add the bot** to the Feishu settings page. The Host renders the QR host-side from the applink of the bot `open_id` that the live connection resolved through `bot/v3/info`, so the code always targets the same bot this DSH profile bridges to; a disconnected channel produces no QR and the card offers a copyable link instead of a camera. Scanning grants no extra reach: DM/group admission, owner claim and allowlists are untouched.
+- New `botCard` RPC on the plugin settings service. It delegates to the channel transport and returns `null` for channels without a scannable card, so the Discord tab renders exactly as before.
+- `qrcode` is a runtime dependency; the client bundle stays dependency-free and only receives a PNG data URL.
+- Build hygiene: `tools/build-client.mjs` normalizes CRLF before slicing the shared template (a Windows checkout previously failed the build), the shared settings helper regained the multiline "restore default" editor the shipped bundle already had, and the retired outbound-archive view was dropped from the template so a rebuild reproduces the published bundle instead of resurrecting it.
+
 ## 0.6.3
 
 - Every incoming channel message now starts with a local date prefix (`[2026-10-27 周二 11:30] text`), derived from the channel's own timestamp in the machine's time zone. The model has no clock and the Host runtime context carries no time, so it used to infer dates from content and get them wrong. The prefix sits at the front of the newest message only, which leaves the cached prompt prefix untouched; command messages are never stamped and the idempotency payload stays exactly as received.

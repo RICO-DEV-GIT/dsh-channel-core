@@ -5,6 +5,7 @@ import { afterPresentedContext } from './question-context.js';
 import { formatAskUserDraft,formatFinalWithQuotedDraft } from './final-format.js';
 import { completedAskUserText } from '../../lib/answered-question.js';
 import { currentSelection, decodeModel, defaultEffort, describeSelection, effortChoices, modelChoices } from './model-commands.js';
+import { channelHint } from '../../lib/channel-hints.js';
 
 // Discord 的"正在输入"提示约 10 秒后自动消失，所以按心跳刷新；上限是保险丝，
 // 防止异常回合把提示一直挂着。心跳失败只影响这个提示，绝不影响回复本身。
@@ -48,7 +49,7 @@ export async function createTransport({config,credentials,signal,receive,state,d
   on('messageCreate',async message=>{
     if(signal.aborted||message.author.bot||message.webhookId||message.system)return;
     const origin=normalize(message,config,client.user.id);
-    try{await receive(origin);}catch(error){state('消息处理失败：'+(error.code??'请查看 DSH 日志'));await present(origin,{text:'消息未被接收，请查看渠道设置与 DSH 日志。',status:'failed',final:true}).catch(()=>{});progress.delete(key(origin));presented.delete(key(origin));}
+    try{await receive(origin);}catch(error){state('消息处理失败：'+channelHint(error));await present(origin,{text:'消息未被接收：'+channelHint(error),status:'failed',final:true}).catch(()=>{});progress.delete(key(origin));presented.delete(key(origin));}
   });
   const hostReady=()=>Boolean(host?.modelCatalog&&host?.selectModel&&host?.projections);
   const sessionFor=async interaction=>{try{return (await sessions(interactionMessage(interaction,config,'/session')))[0];}catch{return undefined;}};

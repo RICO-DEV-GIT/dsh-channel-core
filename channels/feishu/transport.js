@@ -8,6 +8,8 @@ import { completedAskUserText } from '../../lib/answered-question.js';
 import { groupAllowlistFor } from '../../lib/channel-runtime.js';
 import { verifyQueuedImage } from '../../lib/outbound-image.js';
 import { verifyQueuedFile } from '../../lib/outbound-file.js';
+import { buildBotCard } from '../../lib/bot-card.js';
+import { channelHint } from '../../lib/channel-hints.js';
 
 const imageExtension=head=>{
   if(head.length>=12&&head.toString('latin1',0,4)==='RIFF'&&head.toString('latin1',8,12)==='WEBP')return 'webp';
@@ -160,6 +162,47 @@ export function draftCard(body){
     elements:[{tag:'markdown',content,text_size:'notation'}],
   }]);
 }
+/**
+ * Final answer as plain-text messages a phone can actually select.
+ *
+ * A chat message is copyable on a phone while a card's long body is not, but
+ * the SDK's own chunking cuts every 3500 characters mid-sentence — still more
+ * than a phone screen, so selecting a part means zooming and scrolling first.
+ * Splitting on paragraph (then line) boundaries keeps each message about one
+ * screen tall, which is what makes long-press → copy / drag-select usable.
+ */
+export const FINAL_TEXT_CHUNK = 600;
+export function plainFinalText(body){
+  const text=String(body?.text??'').replace(/\s+$/,'');
+  const footer=String(body?.footerText??'').replace(/\s+$/,'');
+  return footer?`${text}\n\n${footer}`:text;
+}
+export function splitFinalText(text,limit=FINAL_TEXT_CHUNK){
+  const source=String(text??'').replace(/\r\n/g,'\n').trim();
+  if(!source)return [];
+  if(source.length<=limit)return [source];
+  const chunks=[];
+  let current='';
+  const flush=()=>{const value=current.trim();if(value)chunks.push(value);current='';};
+  const add=value=>{
+    if(!value)return;
+    if(!current){current=value;return;}
+    if((current+'\n\n'+value).length<=limit){current=current+'\n\n'+value;return;}
+    flush();current=value;
+  };
+  for(const paragraph of source.split(/\n{2,}/)){
+    if(paragraph.length<=limit){add(paragraph);continue;}
+    // A single oversized paragraph: keep line boundaries, hard-cut only lines
+    // that cannot fit even alone (code blocks, tables, unbroken runs).
+    for(const line of paragraph.split('\n')){
+      if(line.length<=limit){add(line);continue;}
+      flush();
+      for(let i=0;i<line.length;i+=limit)chunks.push(line.slice(i,i+limit));
+    }
+  }
+  flush();
+  return chunks;
+}
 const withinBudget=payload=>byteLength(JSON.stringify(payload))<=CARD_JSON_BYTES;
 
 /** Keep every byte of the final answer; further split any JSON-escaped outlier. */
@@ -223,6 +266,9 @@ export async function createTransport({config,credentials,signal,receive,state,d
     return {...body,agentName:role||'Agent',footerText};
   }
   const progress=new Map(),presented=new Map(),kitRecords=new Map(),questionCards=new Map(),questionContexts=new Map(),disposers=[];
+  // Bot identity for the scannable card: resolved once per transport, since it
+  // cannot change while the same app credentials are in use.
+  let botIdentity=null;
   // Steer segmentation: generation guard plus the last payload a user actually saw.
   // One record per card segment owns its generation and its last visible payload,
   // so freezing, releasing and bounding the lifetime all happen in one place.
@@ -315,8 +361,10 @@ export async function createTransport({config,credentials,signal,receive,state,d
     const origin=normalize(message,config);
     try{await receive(origin);}
     catch(error){
-      state('消息处理失败：'+(error?.code??'请查看 DSH 日志'));
-      await present(origin,{text:'消息未被接收，请查看渠道设置与 DSH 日志。',status:'failed',final:true}).catch(()=>{});
+      // An operator reads this card, not a log: say what to change, and keep the
+      // machine code in parentheses so a support report still identifies it.
+      state('消息处理失败：'+channelHint(error));
+      await present(origin,{text:'消息未被接收：'+channelHint(error),status:'failed',final:true}).catch(()=>{});
       progress.delete(key(origin));presented.delete(key(origin));
     }
   }));
@@ -480,6 +528,32 @@ export async function createTransport({config,credentials,signal,receive,state,d
     showPublicDrafts:config.streaming.mode==='progress'&&config.streaming.progress.draft,
     start:()=>channel.connect(),
     details:()=>({feishuCardEngine:kitRecords.size?'CardKit':kitDisabled?'兼容模式（CardKit 不可用）':config.streaming.cardEngine==='patch'?'兼容模式':'CardKit 待首次流式创建'}),
+    /**
+     * Scannable bot card. The Channel SDK keeps the bot identity internally:
+     * it exposes `setBotIdentity(bot)` and `fetchBotIdentity()` (a
+     * `GET /open-apis/bot/v3/info` call), but no public getter — reading
+     * `getBotIdentity()` here produced `undefined` forever, which is why the
+     * card never rendered a QR. Ask the SDK to fetch it once and cache the
+     * answer, so repeated page loads do not spend an API call.
+     */
+    botCard:async()=>{
+      let identity=botIdentity,failure=null;
+      if(!identity?.openId){
+        if(typeof channel.fetchBotIdentity==='function'){
+          try{identity=await channel.fetchBotIdentity();}
+          catch(error){failure=error;identity=null;}
+        }else identity=null;
+        if(identity?.openId)botIdentity=identity;
+      }
+      if(!identity?.openId){
+        // Say why: an empty card is indistinguishable from a broken one, and the
+        // settings page now prints this text verbatim.
+        if(failure)throw Object.assign(new Error('读取机器人身份失败：'+(failure?.message||failure?.code||'未知原因')),{code:'feishu-bot-identity-failed'});
+        return null;
+      }
+      try{return await buildBotCard(identity,config.domain);}
+      catch(error){throw Object.assign(new Error('机器人二维码生成失败：'+(error?.message||error?.code||'未知原因')),{code:'feishu-bot-card-failed'});}
+    },
     cutProgress,
     close,
     progress:config.streaming.mode!=='off'?(origin,body)=>present(origin,body,[],config.streaming):undefined,
@@ -498,6 +572,34 @@ export async function createTransport({config,credentials,signal,receive,state,d
         if(body.feishuStatusCard.schema!=='2.0'||!withinBudget(body.feishuStatusCard))
           throw new Error('feishu-status-card-invalid');
         return channel.send(origin.conversationId,{card:body.feishuStatusCard},sendOptions(origin));
+      }
+      // `auto` means: a private chat is read on a phone, so deliver the answer as
+      // a message the reader can select and copy; a group keeps the card.
+      const textFinal=config.streaming.finalFormat==='text'
+        ||(config.streaming.finalFormat==='auto'&&origin.kind==='dm');
+      if(textFinal){
+        // A plain message is the copy-friendly delivery. The live progress card
+        // is recalled first so the answer never sits under a stale "进行中" card;
+        // a recall outside Feishu's window just leaves the old card behind.
+        const finished=await presentation({...body,final:true},true);
+        const chunks=splitFinalText(plainFinalText(finished));
+        if(!chunks.length)throw new Error('feishu-final-text-empty');
+        const id=key(origin),previous=progress.get(id);
+        progress.delete(id);presented.delete(id);kitRecords.delete(id);
+        if(previous&&typeof channel.recallMessage==='function')
+          await channel.recallMessage(previous).catch(()=>{});
+        // One screen-sized message per chunk: a single multi-thousand-character
+        // bubble is exactly as hard to select on a phone as a card.
+        let result;
+        for(const chunk of chunks){
+          const sent=await channel.send(origin.conversationId,{text:chunk},sendOptions(origin));
+          result??=sent;
+        }
+        const pending=questionCards.get(id);
+        if(pending)await retireQuestionCard(pending.messageId,origin.conversationId,undefined,
+          pending.accepted?undefined:'ASK_USER_INVALIDATED');
+        questionContexts.delete(id);
+        return result;
       }
       const finished=await presentation({...body,final:true},true);
       const hasDrafts=origin.kind==='dm'&&config.streaming.mode==='progress'

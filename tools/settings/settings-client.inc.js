@@ -74,6 +74,30 @@ function RolePicker({scope,value,disabled,label,onChange}) {
     catalog.roles.map(role=>e('option',{key:role.preset,value:role.preset},role.name+' · '+(role.workspaceTitle||role.preset)))),
     error?e('small',{role:'status'},'角色目录读取失败：'+error):!catalog.available?e('small',null,'指令文件与角色插件不可用；原路径配置仍可使用。'):null);
 }
+function PresetPicker({scope,value,disabled,label,onChange}) {
+  const e=React.createElement,[catalog,setCatalog]=React.useState(null),[error,setError]=React.useState('');
+  React.useEffect(()=>{
+    let active=true,sequence=0;
+    const load=()=>{const current=++sequence;scope.call('presetCatalog',{}).then(result=>{
+      if(!active||current!==sequence)return;
+      const presets=Array.isArray(result?.presets)?result.presets:[];
+      setCatalog({presets,default:String(result?.default??'')});setError('');
+    }).catch(failure=>{if(active&&current===sequence)setError(failure.message);});};
+    load();window.addEventListener('focus',load);
+    return()=>{active=false;window.removeEventListener('focus',load);};
+  },[scope]);
+  // A Host without the preset registry keeps the plain text field: an operator
+  // may still be running a deployment that names presets itself.
+  if(!catalog)return e('div',null,e('input',{id:'dsh-config-agentPreset','aria-label':label,type:'text',value,disabled,onChange:event=>onChange(event.target.value)}),
+    error?e('small',{role:'status'},'预设目录读取失败，可手动填写：'+error):e('small',null,'正在读取本机可用预设…'));
+  const known=catalog.presets.some(row=>row.id===value);
+  const autoLabel=catalog.default?'留空（跟随默认：'+catalog.default+'）':'留空（跟随宿主默认预设）';
+  return e('div',null,e('select',{id:'dsh-config-agentPreset','aria-label':label,value,disabled,onChange:event=>onChange(event.target.value)},
+    e('option',{value:''},autoLabel),
+    value&&!known?e('option',{value},value+'（本机不存在，会自动回退默认）'):null,
+    catalog.presets.map(row=>e('option',{key:row.id,value:row.id},row.name&&row.name!==row.id?row.name+' · '+row.id:row.id)),
+  ),e('small',null,catalog.presets.length?'可选：'+catalog.presets.map(row=>row.id).join(' · '):'宿主未提供预设列表，可手动填写预设 ID。'));
+}
 function FileConfigPage({ scope, title, description, fields, actionLabel, credentialApi, credentials, credentialTitle='凭证', credentialsFirst=false }) {
   const e = React.createElement, snapshot = useFileConfig(scope);
   const [editor, setEditor] = React.useState({ base: null, draft: null, error: '', saved: false });
@@ -119,10 +143,16 @@ function FileConfigPage({ scope, title, description, fields, actionLabel, creden
         :e('small',null,'凭证服务暂不可用')));
     if (spec.type === 'readonly') input = e('div', { className: 'dpc-status', id }, snapshot.details?.[spec.detail] ?? spec.placeholder ?? '—');
     else if (spec.type === 'boolean') input = e(DshSwitch, { label: spec.label, disabled: common.disabled, checked: value, onChange: next => change(spec.key, next) });
-    else if (spec.type === 'multiline') input = e('textarea', {...common,rows:5,value,onChange:event=>change(spec.key,event.target.value)});
+    else if (spec.type === 'multiline') {
+      const editor=e('textarea', {...common,rows:5,value,onChange:event=>change(spec.key,event.target.value)});
+      input=spec.defaultValue===undefined?editor:e('div',{className:'dpc-prompt-editor'},editor,
+        e(DshButton,{type:'button',variant:'ghost',size:'sm',disabled:common.disabled||value===spec.defaultValue,
+          onClick:()=>change(spec.key,spec.defaultValue)},'恢复默认'));
+    }
     else if (spec.type === 'list') input = e('textarea', {...common, rows: Math.max(3,Math.min(8,value.length+1)), value:editor.listText?.[spec.key]??value.join('\n'),
       onChange:event=>{const text=event.target.value;setEditor(previous=>({...previous,draft:configChange(previous.draft,spec.key,text.split(/[\n,]/).map(item=>item.trim()).filter(Boolean)),listText:{...previous.listText,[spec.key]:text},error:'',errorCode:'',saved:false}));} });
     else if (spec.type === 'role') input = e(RolePicker,{scope,value,disabled:common.disabled,label:spec.label,onChange:next=>change(spec.key,next)});
+    else if (spec.type === 'preset') input = e(PresetPicker,{scope,value,disabled:common.disabled,label:spec.label,onChange:next=>change(spec.key,next)});
     else if (spec.type === 'model') input = e(ModelPicker,{scope,kind:spec.kind,provider:configValue(editor.draft,spec.providerKey),model:value,emptyLabel:spec.emptyLabel,disabled:common.disabled,label:spec.label,onChange:selection=>setEditor(previous=>({...previous,draft:configChange(configChange(previous.draft,spec.providerKey,selection.provider),spec.key,selection.model),error:'',errorCode:'',saved:false}))});
     else if (spec.type === 'select') input = e('select', { ...common, value, onChange: event => change(spec.key, spec.numeric ? Number(event.target.value) : event.target.value) }, spec.options.map(([key, label]) => e('option', { key, value: key }, label)));
     else if (spec.type === 'order' || spec.type === 'providers') input = e('ol', { className: 'dpc-order' }, value.map((key, index) => e('li', { key },

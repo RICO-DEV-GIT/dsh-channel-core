@@ -190,7 +190,8 @@
         "key": "agentPreset",
         "group": "会话与输入",
         "label": "Agent 预设 ID",
-        "type": "text",
+        "type": "preset",
+        "help": "从本机已注册的预设中选择；留空跟随宿主默认预设。",
         "advanced": false,
         "when": {
           "rolePreset": ""
@@ -502,30 +503,12 @@
     "description": "将飞书消息接入 DSH 原生会话，支持回复、附件和渠道设置。",
     "standalone": true,
     "actionLabel": "重新连接",
-    "credentialFields": {
-      "appSecretRef": "飞书应用密钥"
-    },
     "fields": [
       {
         "key": "enabled",
         "label": "连接渠道",
         "type": "boolean",
         "help": "保存后自动连接；有效凭证用于登录，消息接收范围单独配置。",
-        "group": "账号与连接",
-        "advanced": false
-      },
-      {
-        "key": "appId",
-        "label": "应用 ID",
-        "type": "text",
-        "group": "账号与连接",
-        "advanced": false,
-        "help": "飞书需要 App ID 与 App Secret 配对建立连接；从飞书开发者后台获取。"
-      },
-      {
-        "key": "credentialSecret",
-        "label": "飞书应用密钥",
-        "type": "credential",
         "group": "账号与连接",
         "advanced": false
       },
@@ -646,7 +629,8 @@
         "key": "agentPreset",
         "group": "会话与输入",
         "label": "Agent 预设 ID",
-        "type": "text",
+        "type": "preset",
+        "help": "从本机已注册的预设中选择；留空跟随宿主默认预设。",
         "when": {
           "rolePreset": ""
         },
@@ -714,6 +698,28 @@
           ]
         ],
         "help": "默认 CardKit：流式文字更新卡片文本组件，结束或提问时再更新完整卡片。创建 CardKit 卡片失败且尚未发消息时自动回退兼容模式；无法确认消息是否已经发出时不会盲目重试，避免重复卡片。刷新间隔仍按下方设置。",
+        "advanced": false
+      },
+      {
+        "key": "streaming.finalFormat",
+        "group": "回复与显示",
+        "label": "最终回复形式",
+        "type": "select",
+        "options": [
+          [
+            "auto",
+            "自动：私聊纯文本、群聊卡片"
+          ],
+          [
+            "card",
+            "卡片（带状态栏与过程记录）"
+          ],
+          [
+            "text",
+            "纯文本（所有会话）"
+          ]
+        ],
+        "help": "自动：私聊按手机阅读处理，最终答复作为普通消息发送，长按即可选中复制；群聊仍用卡片，排版和过程记录更清楚。卡片适合阅读，但长文本要先展开再复制。纯文本发送前会撤回进度卡片。",
         "advanced": false
       },
       {

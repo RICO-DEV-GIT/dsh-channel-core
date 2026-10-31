@@ -15,6 +15,11 @@ config.json
 *.tgz
 *.zip
 *.pem
+# Test runs that write a ConfigFile with a relative path drop these next to the
+# repo; they are never source.
+test-config-*/
+*.tmp
+*.lock
 local-notes.md
 local-tools/
 home/
