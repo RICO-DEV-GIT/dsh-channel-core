@@ -82,6 +82,20 @@ test('the console checklist only appears when it can help', () => {
   assert(source.includes('const needsHelp=!connected'), 'visibility is derived from channel state');
 });
 
+test('the account manager lists bots with add-bot and delete actions', () => {
+  // Multiple bots are only useful if each row can be bound (add bot) and retired
+  // (delete) from the page; the server side has existed since M3.
+  assert(source.includes('dcb-accounts'), 'the account section renders');
+  assert(source.includes('+ 新增账号'), 'a new account can be created from the page');
+  assert(source.includes("'添加机器人'"), 'an unbound account offers scanning');
+  assert(source.includes("'删除'"), 'each account can be deleted');
+  assert(source.includes('确认删除'), 'deletion needs a second click');
+  assert(source.includes('accountRemove'), 'deletion goes through the account RPC');
+  assert(source.includes('accountCreate'), 'creation goes through the account RPC');
+  assert(source.includes('rowPoll'), 'a per-account scan polls its own device code');
+  assert(source.includes('rowScan'), 'the scan result renders next to its account');
+});
+
 test('a failing connection shows the console checklist', () => {
   // The manual path cannot work unless the app enables bot capability and a
   // long-connection subscription; the page has to name those switches.

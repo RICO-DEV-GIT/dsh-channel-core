@@ -51,6 +51,19 @@ test('v2 rejects the shapes that would make accounts ambiguous', () => {
   assert.throws(() => schema.validate({ schemaVersion: 2, accounts: { a: {} }, shared: { throttleMs: 99999 } }), /shared.throttleMs/);
 });
 
+test('an account may not carry shared display options', () => {
+  // Silently dropping them would let an operator believe a per-account setting
+  // took effect; both keys belong to `shared`.
+  assert.throws(
+    () => schema.validate({ schemaVersion: 2, accounts: { a: { appId: 'x', streaming: { mode: 'off' } } } }),
+    /不能单独设置 streaming/,
+  );
+  assert.throws(
+    () => schema.validate({ schemaVersion: 2, accounts: { a: { appId: 'x', throttleMs: 800 } } }),
+    /不能单独设置 throttleMs/,
+  );
+});
+
 test('account ids are generated without collisions', () => {
   assert.equal(nextAccountId({}), 'default');
   assert.equal(nextAccountId({ default: {} }), 'account-2');

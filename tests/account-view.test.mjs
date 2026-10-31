@@ -97,3 +97,12 @@ test('an account that disappeared reads as null instead of throwing', () => {
   assert.equal(gone.value, null);
   assert.equal(gone.snapshot().value, null);
 });
+
+test('the slice is frozen deeply, so a stray push fails instead of editing the file', () => {
+  const file = fileOf(structuredClone(v2));
+  const view = accountView(file, 'default');
+  assert.throws(() => { view.value.allowedUsers.push('ou_evil'); }, TypeError);
+  assert.deepEqual(file.value.accounts.default.allowedUsers, ['ou_a'], 'the stored array is untouched');
+  assert.throws(() => { view.value.streaming.mode = 'off'; }, TypeError);
+  assert.equal(file.value.shared.streaming.mode, 'progress');
+});

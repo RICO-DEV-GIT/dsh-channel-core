@@ -67,9 +67,13 @@ export function isMultiAccount(value){return Boolean(value)&&typeof value==='obj
 
 function validateAccount(raw,accountId){
   if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new ConfigError('invalid-config','账号配置必须是对象：'+accountId);
-  // `accountId` is the map key and `streaming` lives in shared, so a migrated v1
-  // object (which carries both) must drop them here rather than fail validation.
-  const {streaming:_ignoredStreaming,accountId:_ignoredAccountId,schemaVersion:_ignoredVersion,...input}=raw;
+  // `accountId` is the map key, `schemaVersion` is the object-level version. Both
+  // are dropped silently so a migrated v1 slice validates.
+  const {accountId:_ignoredAccountId,schemaVersion:_ignoredVersion,...input}=raw;
+  // Display options are shared, not per account: accepting them here would let an
+  // operator "set" something that silently does nothing.
+  for(const key of ['streaming','throttleMs'])
+    if(Object.hasOwn(input,key))throw new ConfigError('invalid-config','账号「'+accountId+'」不能单独设置 '+key+'，请写在 shared 里');
   for(const key of Object.keys(input))if(!Object.hasOwn(ACCOUNT_FIELDS,key))throw new ConfigError('invalid-config','未知的账号配置项：'+accountId+'.'+key);
   const value={...structuredClone(ACCOUNT_FIELDS),...structuredClone(input)};
   for(const [key,rule] of Object.entries(ACCOUNT_RULES))if(!rule(value[key],value))throw new ConfigError('invalid-config','账号配置项无效：'+accountId+'.'+key);
