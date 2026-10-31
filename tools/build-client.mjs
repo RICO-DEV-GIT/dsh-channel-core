@@ -223,8 +223,6 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     const [confirmDelete,setConfirmDelete]=React.useState('');
     const [rowScan,setRowScan]=React.useState(null);
     const rowTimer=React.useRef(null);
-    const accountsRef=React.useRef([]);
-    accountsRef.current=accounts??[];
     const refreshAccounts=async()=>{
       try{const result=await scope.call('getConfig',{});setAccounts(result?.accounts??[]);}
       catch(error){setAccounts([]);setNotice('读取账号列表失败：'+error.message);}
@@ -238,6 +236,25 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       if(!selected)accountSelection.set((list.find(row=>row.connected)??list[0]).id);
       else if(!list.some(row=>row.id===selected))accountSelection.set(list[0].id);
     },[accounts,selected]);
+    // Switching accounts must not carry one account's half-finished work into
+    // another: an in-flight scan would be applied to the newly selected account
+    // (registration calls are scoped), and a typed path would be saved onto it.
+    // The first automatic selection is not a switch, so it must not cancel a scan
+    // the operator started while the account list was still loading.
+    const prevSelected=React.useRef(null);
+    const bootedSelection=React.useRef(false);
+    React.useEffect(()=>{
+      if(!selected)return;
+      if(!bootedSelection.current){bootedSelection.current=true;prevSelected.current=selected;return;}
+      if(prevSelected.current===selected)return;
+      prevSelected.current=selected;
+      setWorkspaceDraft('');
+      setManualPath(false);
+      setMissingPath('');
+      setNotice('');
+      stop();
+      setRegistration({status:'idle',qr:null,message:''});
+    },[selected]);
     React.useEffect(()=>()=>{if(rowTimer.current)clearTimeout(rowTimer.current);},[]);
     const addAccount=async()=>{
       const bridge=globalThis.__DSH_DIRECTORY_PICKER__;
@@ -535,7 +552,9 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     return e(React.Fragment,null,
       kind==='feishu'?e(FeishuBotPanel,{scope:rootScope,credentialApi}):null,
       e(AgentPresetHint,{scope}),
-      e(FileConfigPage,{...page,scope,credentialApi,credentials,credentialTitle:kind==='discord'?'Discord Bot Token':'飞书应用密钥',credentialsFirst:kind==='discord'}));
+      // key: switching account remounts the form, so an unsaved draft can never be
+      // saved onto the account that was just selected.
+      e(FileConfigPage,{...page,key:kind==='feishu'?(selected||'default'):'single',scope,credentialApi,credentials,credentialTitle:kind==='discord'?'Discord Bot Token':'飞书应用密钥',credentialsFirst:kind==='discord'}));
   }
   function ChannelBundlePage({connection,credentialApi,t}) {
     const [tab,setTab]=React.useState('general');
