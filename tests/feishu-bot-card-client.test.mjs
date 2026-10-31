@@ -8,27 +8,32 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = fs.readFileSync(path.join(root, 'lib/client.js'), 'utf8');
 
 test('Feishu offers one bot entry that becomes the chat QR once connected', () => {
-  assert(source.includes('function FeishuBotPanel'), 'the single bot panel is bundled');
+  assert(source.includes('function FeishuBotPanel'), 'the bot panel is bundled');
   assert(!source.includes('function FeishuBotCard'), 'the old separate card is gone');
   assert(!source.includes('function FeishuRegistrationCard'), 'the old separate registration card is gone');
   assert(source.includes('e(FeishuBotPanel,{scope:rootScope,credentialApi})'), 'only the Feishu tab renders it, once');
-  // Three states, decided by the channel state instead of by the operator.
-  assert(source.includes("head('连接飞书机器人'"), 'not configured / not connected state');
+  assert(source.includes("head('添加飞书机器人'"), 'the add-a-bot state');
   assert(source.includes("head('机器人已连接'"), 'connected state');
   assert(source.includes('打开与它的私聊'), 'the connected state explains the chat QR');
   assert(source.includes('二维码只包含机器人公开 open_id，不含任何密钥。'), 'the page states what the QR carries');
   assert(source.includes('复制链接'), 'the link stays usable without a camera');
 });
 
-test('one scan owns the whole lifecycle: create, switch, or add the chat', () => {
-  // No manual credential form and no replace button: the phone decides between
-  // a new bot and an existing one, and the same scan stays available while bound.
-  assert(source.includes('扫码添加 / 切换机器人'), 'the scan action is always offered');
-  assert(!source.includes('更换机器人'), 'the replace button is gone');
+test('there is only add and delete: no replace, no switch, no persistent QR', () => {
+  // The incident came from one control meaning two things. Adding always creates a
+  // new row; changing a bot is delete + add, so an existing bot can never be
+  // swapped out silently.
+  assert(source.includes('添加机器人'), 'adding a bot is the only create action');
+  assert(!source.includes('扫码添加 / 切换机器人'), 'the ambiguous switch/scan control is gone');
+  assert(!source.includes('更换机器人'), 'there is no replace path at all');
+  assert(!source.includes('scanBlock()'), 'no persistent scan block is rendered');
+  assert(source.includes(",'删除'"), 'each row can be deleted');
+  assert(source.includes('确认删除'), 'deletion needs a second click');
+  assert(source.includes('accountCreate'), 'adding creates the row through the account RPC');
+  assert(source.includes('accountRemove'), 'deleting goes through the account RPC');
+  assert(source.includes('rowPoll'), 'the scan polls the device code for that row');
   assert(!source.includes('saveManual'), 'the manual credential form is gone');
   assert(!source.includes("id:'dcb-bot-secret'"), 'no secret input is rendered');
-  assert(source.includes('在手机上选择「新建机器人」或「已有机器人」'), 'the phone-side choice is explained');
-  assert.equal((source.match(/scanBlock\(\)/g) ?? []).length, 2, 'both states render the scan block');
 });
 
 test('each state exposes at most two actions', () => {
@@ -82,18 +87,24 @@ test('the console checklist only appears when it can help', () => {
   assert(source.includes('const needsHelp=!connected'), 'visibility is derived from channel state');
 });
 
-test('the account manager lists bots with add-bot and delete actions', () => {
-  // Multiple bots are only useful if each row can be bound (add bot) and retired
-  // (delete) from the page; the server side has existed since M3.
-  assert(source.includes('dcb-accounts'), 'the account section renders');
-  assert(source.includes('+ 新增账号'), 'a new account can be created from the page');
-  assert(source.includes("'添加机器人'"), 'an unbound account offers scanning');
-  assert(source.includes("'删除'"), 'each account can be deleted');
+test('the bot list offers only add and delete', () => {
+  assert(source.includes('dcb-accounts'), 'the bot list renders');
+  assert(source.includes('+ 添加机器人'), 'one button adds a bot');
+  assert(source.includes(",'删除'"), 'each bot can be deleted');
   assert(source.includes('确认删除'), 'deletion needs a second click');
-  assert(source.includes('accountRemove'), 'deletion goes through the account RPC');
-  assert(source.includes('accountCreate'), 'creation goes through the account RPC');
-  assert(source.includes('rowPoll'), 'a per-account scan polls its own device code');
-  assert(source.includes('rowScan'), 'the scan result renders next to its account');
+  assert(source.includes('至少保留一个机器人'), 'the last bot cannot be deleted');
+  assert(!source.includes('+ 新增账号'), 'the separate "create an empty account" step is gone');
+  assert(!source.includes("row.appId?null:e('button'"), 'no row-level add-bot button remains');
+});
+
+test('the server refuses a duplicate bot and a silent replacement', () => {
+  // Both rules live in the RPC layer; read the source because instantiating the
+  // service needs the whole Host.
+  const remote = fs.readFileSync(path.join(root, 'lib/channel-plugin-settings/remote-config.js'), 'utf8');
+  assert(remote.includes('该机器人已经存在'), 'the same app cannot be added twice');
+  assert(remote.includes("account.appId) === String(appId)"), 'duplicate detection compares the app id');
+  assert(remote.includes("plugin-config/account-bound"), 'an already bound account refuses a different bot');
+  assert(remote.includes('assertWorkspaceDisjoint'), 'binding validates the workspace too');
 });
 
 test('a failing connection shows the console checklist', () => {
@@ -112,7 +123,7 @@ test('the settings form follows the selected account', () => {
   // different accounts, and the second bot could never be configured.
   assert(source.includes('accountSelection'), 'one selection store is shared');
   assert(source.includes('createAccountScope'), 'the form talks to the selected account');
-  assert(source.includes('正在编辑'), 'the page says which account is being edited');
+  assert(source.includes('编辑设置'), 'the page says which bot is being edited');
   assert(source.includes("useSelectedAccount"), 'both components read the same selection');
 });
 

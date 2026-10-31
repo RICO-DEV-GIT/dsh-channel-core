@@ -85,21 +85,10 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     const appId=String(config.appId??'').trim();
     const secretRef=String(config.appSecretRef||'FEISHU_APP_SECRET');
     const [card,setCard]=React.useState({status:'idle',png:null,link:null,name:''});
-    const [registration,setRegistration]=React.useState({status:'idle',qr:null,message:''});
     // Feedback that is not a form error (copy result, retry result) gets its own
     // slot instead of borrowing the credential form's message line.
     const [notice,setNotice]=React.useState('');
     const [checklist,setChecklist]=React.useState(false);
-    const timer=React.useRef(null);
-    // The device code has a lifetime; the caller stops polling at it instead of
-    // spinning until the page reloads.
-    const expireAt=React.useRef(0);
-    // Feishu's own cadence: begin reports it, and slow_down raises it.
-    const pollInterval=React.useRef(5);
-    const pollCount=React.useRef(0);
-    const pollFails=React.useRef(0);
-    const stop=()=>{if(timer.current){clearTimeout(timer.current);timer.current=null;}};
-    React.useEffect(()=>()=>stop(),[]);
     // One loader for the first render, the retry button and a credential change:
     // it used to call reload(), which refreshed the form but never asked for a
     // new card, so the panel sat on the loading text forever.
@@ -199,7 +188,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
           e('span',null,(row.ok?'✅ ':'⚠️ ')+row.label),
           row.ok?null:(row.key==='enabled'
             ?e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void enableChannel();}},'打开连接渠道')
-            :e('button',{type:'button',className:'dcb-bot-copy',onClick:begin},'扫码配置凭证'))))));
+            :e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void addRobot();}},'添加机器人'))))));
     };
     // The workspace is not a one-time setting: it must stay replaceable after the
     // health block disappears (which happens once all three checks pass).
@@ -252,21 +241,29 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       setManualPath(false);
       setMissingPath('');
       setNotice('');
-      stop();
-      setRegistration({status:'idle',qr:null,message:''});
+      // A scan belongs to the account it was started for; nothing of it may leak
+      // into the account that was just selected.
+      if(rowTimer.current)clearTimeout(rowTimer.current);
+      setRowScan(null);
     },[selected]);
     React.useEffect(()=>()=>{if(rowTimer.current)clearTimeout(rowTimer.current);},[]);
-    const addAccount=async()=>{
+    // ONE action adds one robot: choose its own workspace, then scan. There is no
+    // "replace" path at all — to change a robot you delete it and add it again,
+    // which is the only way a bot can never be silently swapped out.
+    const addRobot=async()=>{
       const bridge=globalThis.__DSH_DIRECTORY_PICKER__;
-      if(!bridge||typeof bridge.pick!=='function'){setNotice('当前客户端不支持系统目录选择，请先手动设置工作区。');return;}
+      if(!bridge||typeof bridge.pick!=='function'){setNotice('当前客户端不支持系统目录选择，无法添加机器人。');return;}
       setAccountBusy('add');
       try{
         const picked=await bridge.pick();
         if(typeof picked!=='string'||!picked)return;
         const created=await scope.call('accountCreate',{workspacePath:picked});
-        setAccounts(created?.accounts??null);
-        setNotice('已新增账号 '+(created?.accountId??'')+'，工作区 '+picked);
-      }catch(error){setNotice('新增账号失败：'+error.message);}
+        const list=created?.accounts??[];
+        setAccounts(list);
+        const row=list.find(item=>item.id===created?.accountId);
+        setNotice('已新增机器人，正在生成二维码…');
+        await scanForAccount(created.accountId,row?.credentialRef);
+      }catch(error){setNotice('新增机器人失败：'+error.message);}
       finally{setAccountBusy('');}
     };
     const removeAccount=async accountId=>{
@@ -316,7 +313,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       }
       setRowScan({accountId,status:'error',qr:null,message:result.message||'扫码未完成，请重试。'});
     };
-    const addBotTo=async(accountId,credentialRef)=>{
+    const scanForAccount=async(accountId,credentialRef)=>{
       if(rowTimer.current)clearTimeout(rowTimer.current);
       setRowScan({accountId,status:'begin',qr:null,message:'正在生成二维码…'});
       try{
@@ -331,22 +328,22 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       if(!accounts)return null;
       return e('div',{className:'dcb-accounts'},
         e('div',{className:'dcb-health-head'},
-          e('strong',null,'账号（'+accounts.length+'）'),
-          e('button',{type:'button',className:'dcb-bot-btn',disabled:accountBusy==='add',onClick:()=>{void addAccount();}},'+ 新增账号')),
+          e('strong',null,'机器人（'+accounts.length+'）'),
+          e('button',{type:'button',className:'dcb-bot-btn',disabled:accountBusy==='add',onClick:()=>{void addRobot();}},'+ 添加机器人')),
+        e('p',{className:'dcb-bot-link'},'每个机器人使用独立工作区、独立会话；同一个机器人只能添加一次。'),
         e('ul',null,accounts.map(row=>e('li',{key:row.id,className:'dcb-account'},
-          e('div',{className:'dcb-account-main'},
+          e('div',{className:row.id===selected?'dcb-account-main dcb-account-active':'dcb-account-main',onClick:()=>accountSelection.set(row.id),role:'button',tabIndex:0},
             e('strong',null,row.id),
             e('code',null,row.appIdMasked||'未绑定机器人'),
             e('span',null,row.workspacePath||'未设置工作区'),
             e('span',{className:row.connected?'dcb-ok':'dcb-todo'},row.connected?'● 已连接':(row.enabled?'○ 未连接':'○ 已关闭'))),
           e('div',{className:'dcb-bot-actions'},
-            row.appId?null:e('button',{type:'button',className:'dcb-bot-btn',onClick:()=>{void addBotTo(row.id,row.credentialRef);}},'添加机器人'),
             confirmDelete===row.id
               ?e(React.Fragment,null,
                 e('span',{className:'dcb-reg-err'},'历史与凭证一并删除'),
                 e('button',{type:'button',className:'dcb-bot-btn',disabled:accountBusy===row.id,onClick:()=>{void removeAccount(row.id);}},'确认删除'),
                 e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>setConfirmDelete('')},'取消'))
-              :e('button',{type:'button',className:'dcb-bot-copy',disabled:accounts.length<2,title:accounts.length<2?'至少保留一个账号':'',onClick:()=>setConfirmDelete(row.id)},'删除')),
+              :e('button',{type:'button',className:'dcb-bot-copy',disabled:accounts.length<2,title:accounts.length<2?'至少保留一个机器人':'',onClick:()=>setConfirmDelete(row.id)},'删除')),
           rowScan?.accountId===row.id?e('div',{className:'dcb-reg-body'},
             rowScan.qr?e('img',{src:rowScan.qr,alt:'飞书扫码二维码',width:180,height:180}):null,
             e('p',{className:'dcb-reg-msg'+(rowScan.status==='error'?' dcb-reg-err':'')},rowScan.message)):null))));
@@ -356,105 +353,13 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       if(list.length<2)return null;
       return e('div',{className:'dcb-health dcb-workspace'},
         e('div',{className:'dcb-health-head'},
-          e('strong',null,'正在编辑：'+(selected||'默认账号')),
-          e('select',{className:'dcb-bot-btn',value:selected,onChange:event=>accountSelection.set(event.target.value),'aria-label':'选择要编辑的账号'},
+          e('strong',null,'编辑设置：'+(selected||'默认机器人')),
+          e('select',{className:'dcb-bot-btn',value:selected,onChange:event=>accountSelection.set(event.target.value),'aria-label':'选择要编辑的机器人'},
             list.map(row=>e('option',{key:row.id,value:row.id},
               row.id+(row.appIdMasked?' · '+row.appIdMasked:'')+(row.connected?' · 已连接':''))))));
     };
-    const poll=async deviceCode=>{
-      let result;
-      try{result=await scope.call('registrationPoll',{deviceCode});}
-      catch(error){
-        // A transient RPC/network failure is not a failed scan: Feishu keeps the
-        // code valid, so retry a couple of times before giving up.
-        if(pollFails.current<3&&Date.now()<expireAt.current){
-          pollFails.current++;
-          timer.current=setTimeout(()=>{void poll(deviceCode);},6000);
-          return;
-        }
-        stop();setRegistration({status:'error',qr:null,message:(error.message||'轮询失败')+'；请重新生成二维码。'});return;
-      }
-      pollFails.current=0;
-      if(result.status==='success'){
-        stop();
-        try{
-          // Secret first, App ID second. Writing the config reconnects the
-          // channel, and reconnecting with the NEW app id plus the OLD secret
-          // is a guaranteed handshake failure that can stall on "正在连接".
-          let secretSaved=false;
-          if(result.appSecret&&credentialApi){const saved=await credentialApi.set(secretRef,result.appSecret);if(!saved.ok)throw new Error(saved.error?.message||'保存密钥失败');secretSaved=true;}
-          // The openId may be absent (an existing app, or a tenant without user
-          // info); send an empty string rather than dropping the field, which
-          // the Host gateway reports as a signature mismatch.
-          const applied=await scope.call('registrationApply',{appId:result.appId,openId:result.openId||'',domain:result.domain||''});
-          const ref=applied&&applied.value&&applied.value.appSecretRef?applied.value.appSecretRef:secretRef;
-          await scope.reload();
-          const parts=['已写入 App ID '+(result.appId||'')];
-          if(result.domain==='lark')parts.push('区域 Lark');
-          if(result.openId)parts.push('主人 '+result.openId);
-          if(secretSaved)parts.push('密钥已保存');
-          setRegistration({status:'done',qr:null,message:parts.join(' · ')+'。'});
-        }catch(error){
-          setRegistration({status:'error',qr:null,message:'自动写入失败：'+error.message+'。请点「重新生成二维码」再扫码一次。'});
-        }
-        return;
-      }
-      if(result.status==='pending'){
-        // Stop at the code's own lifetime: polling forever left the card stuck on
-        // "等待扫码…" with the generate button disabled, so nothing could recover
-        // it without reloading the page.
-        if(Date.now()>expireAt.current){stop();setRegistration({status:'error',qr:null,message:'二维码已过期，请重新生成。'});return;}
-        // Feishu answers 400 slow_down when polled faster than its own interval;
-        // honour the interval from begin (5s) and back off further when asked.
-        const base=Math.max(5,pollInterval.current);
-        const wait=result.slowDown?Math.min(30,base+5):base;
-        pollInterval.current=wait;
-        pollCount.current++;
-        // After a while the only useful advice is: confirm on the phone, then
-        // regenerate and follow the checklist — there is no manual form anymore.
-        const hint=pollCount.current>=6?'　请在手机上完成确认；若已确认仍无响应，点「重新生成二维码」并按下方清单检查应用配置。':'';
-        setRegistration(current=>({...current,message:current.message.split('　如果手机上选的是')[0]+hint}));
-        timer.current=setTimeout(()=>{void poll(deviceCode);},wait*1000);return;
-      }
-      stop();
-      const hint=result.status==='access_denied'?'未授权，流程已取消。'
-        :result.status==='expired'?'二维码已过期，请重新生成。'
-        :('飞书返回错误：'+(result.message||result.error||'未知原因'));
-      setRegistration({status:'error',qr:null,message:hint});
-    };
-    const begin=async()=>{
-      if(registration.status==='waiting')return;
-      setRegistration({status:'begin',qr:null,message:''});
-      try{
-        const value=await scope.call('registrationBegin',{});
-        expireAt.current=Date.now()+(Number(value.expireSeconds)||600)*1000;
-        // Poll at the interval Feishu asked for; faster answers are rejected with
-        // slow_down and the scan then looks stuck even though it is working.
-        pollInterval.current=Math.max(5,Number(value.intervalSeconds)||5);
-        pollCount.current=0;pollFails.current=0;
-        setRegistration({status:'waiting',qr:value.qrPng,message:'用手机飞书扫码：还没有机器人就选「新建应用」（自动写入）；已有就选「已有应用」，把手机上的 App ID 与密钥填到下方。二维码约 '+(value.expireSeconds||600)+' 秒有效。'});
-        timer.current=setTimeout(()=>{void poll(value.deviceCode);},pollInterval.current*1000);
-      }catch(error){setRegistration({status:'error',qr:null,message:error.message||'生成二维码失败'});}
-    };
     const head=(title,text)=>e('div',{className:'dcb-bot-head'},
       e('div',null,e('h3',null,title),e('p',null,text)));
-    const registrationMessage=()=>registration.message
-      ?e('p',{className:'dcb-reg-msg'+(registration.status==='error'?' dcb-reg-err':''),role:registration.status==='error'?'alert':undefined},registration.message)
-      :null;
-    // ONE action owns the whole lifecycle: scan, then choose "new bot" or an
-    // existing one on the phone. Feishu returns the id and the secret for both,
-    // so nothing has to be pasted here — and because it stays available while
-    // connected, switching bots never needs a console reset first.
-    const scanBlock=()=>e(React.Fragment,null,
-      e('div',{className:'dcb-bot-actions'},
-        e('button',{type:'button',className:'dcb-bot-btn',onClick:begin,disabled:registration.status==='waiting'||registration.status==='begin'},
-          registration.status==='waiting'?'等待手机确认…':(registration.qr?'重新生成二维码':'扫码添加 / 切换机器人'))),
-      registration.qr?e('div',{className:'dcb-reg-body'},
-        e('img',{src:registration.qr,alt:'飞书扫码二维码',width:220,height:220}),
-        e('div',{className:'dcb-bot-meta'},
-          e('strong',null,'手机飞书扫码'),
-          e('p',{className:'dcb-bot-link'},'在手机上选择「新建机器人」或「已有机器人」，确认后这里会自动写入 App ID、密钥和主人身份。'))):null,
-      registrationMessage());
     const noticeLine=()=>notice?e('p',{className:'dcb-reg-msg'},notice):null;
     // A scanned app only connects when the console side is configured; spell out
     // the exact switches instead of leaving the operator with "check permissions".
@@ -485,19 +390,17 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     }
     if(!connected){
       return e('section',{className:'dcb-bot'},
-        head('连接飞书机器人','用手机飞书扫描下面的二维码：在手机上选择「新建机器人」会自动创建并写入凭证，选择「已有机器人」会直接拉取该应用的 App ID 与密钥。全程不用手填，也不用先去开发者后台重置凭证。'),
+        head('添加飞书机器人','点「+ 添加机器人」：先为它选择独立的工作区，再用手机飞书扫码。每个机器人独立工作区、独立会话，可以同时在线。'),
         accountPicker(),
         healthBlock(),
         workspaceLine(),
         accountsBlock(),
-        scanBlock(),
         noticeLine(),
         checklistBlock());
     }
     return e('section',{className:'dcb-bot'},
       head('机器人已连接',(card.name||'机器人')+'：下面这张是它的名片二维码，扫码即可打开与它的私聊；发送任意消息后按「主人与记忆」的规则完成认领。二维码只包含机器人公开 open_id，不含任何密钥。'),
-      registration.qr?null
-        :card.png?e('div',{className:'dcb-bot-body'},
+      card.png?e('div',{className:'dcb-bot-body'},
         e('img',{src:card.png,alt:'飞书机器人二维码',width:220,height:220}),
         e('div',{className:'dcb-bot-meta'},
           e('strong',null,card.name||'飞书机器人'),
@@ -508,13 +411,10 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
           e('p',{className:'dcb-bot-msg'+(card.status==='error'?' dcb-reg-err':''),role:card.status==='error'?'alert':undefined},card.message||'正在生成二维码…'),
           e('div',{className:'dcb-bot-actions'},
             e('button',{type:'button',className:'dcb-bot-copy',onClick:()=>{void fetchCard();}},'重新生成二维码'))),
-      // Still available when connected: scanning again is how a different bot is
-      // added or switched to, chosen entirely on the phone.
       accountPicker(),
       healthBlock(),
       workspaceLine(),
       accountsBlock(),
-      scanBlock(),
       noticeLine(),
       checklistBlock());
   }
