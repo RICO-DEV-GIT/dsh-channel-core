@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildModelPickerCard, readModelPickerAction, conversationalModels, providersOf,
-  modelOptionsOf, pageCountOf, pageOfModel, PAGE_SIZE, INCLUDE_PROBE,
+  modelOptionsOf, pageCountOf, pageOfModel, PAGE_SIZE,
 } from '../lib/model-picker-card.js';
 
 const catalog = {
@@ -26,8 +26,12 @@ const LAST_PAGE = pageCountOf(many) - 1;
 const formOf = card => card.body.elements.find(element => element.tag === 'form');
 const selectOf = card => formOf(card).elements.find(element => element.tag === 'select_static');
 const formButtons = card => formOf(card).elements.filter(element => element.tag === 'button');
-const pagerOf = card => (card.body.elements.find(element => element.tag === 'column_set')?.columns ?? [])
-  .flatMap(column => column.elements ?? []);
+/** Pager nodes: the two-in-a-row column_set, or a lone full-width button. */
+const pagerOf = card => {
+  const columnSet = card.body.elements.find(element => element.tag === 'column_set');
+  if (columnSet) return columnSet.columns.flatMap(column => column.elements ?? []);
+  return card.body.elements.filter(element => element.tag === 'button');
+};
 
 test('non-chat models are filtered out of the picker', () => {
   const ark = providersOf(catalog).find(group => group.id === 'ark');
@@ -41,10 +45,10 @@ test('every model is reachable across pages', () => {
   assert(values.includes('opencode-go/deepseek-v4-pro'));
 });
 
-test('the probe is off and the card asks to be updatable', () => {
-  assert.equal(INCLUDE_PROBE, false, 'diagnostics are done');
+test('the card asks to be updatable and carries no diagnostics', () => {
   const card = buildModelPickerCard({ catalog: many });
   assert.deepEqual(card.config, { wide_screen_mode: true, update_multi: true });
+  assert.equal(JSON.stringify(card).includes('测试'), false, 'the probe is gone');
 });
 
 test('one page keeps a single form: select + 切换, no pager when it all fits', () => {
@@ -64,20 +68,25 @@ test('the select shows no initial option; the header states the real model', () 
   assert.equal(selectOf(card).options[0].value, 'ark/doubao-snapshot-pro', 'the current model is listed first');
 });
 
-test('paging is one row of buttons outside the form; first page has no 上一页, last none 下一页', () => {
+test('paging sits outside the form; first page has no 上一页, last none 下一页', () => {
   const first = buildModelPickerCard({ catalog: many });
   assert.deepEqual(pagerOf(first).map(button => button.text.content), ['下一页 →']);
   assert.equal(formButtons(first).length, 1, 'the form still only holds 切换');
+  // A lone pager button takes the whole row instead of an empty second column.
+  assert.equal(first.body.elements.some(element => element.tag === 'column_set'), false);
+  assert.equal(pagerOf(first)[0].width, 'fill');
 
   const middle = buildModelPickerCard({ catalog: many, page: 1 });
   assert.deepEqual(pagerOf(middle).map(button => button.text.content), ['← 上一页', '下一页 →']);
   const columns = middle.body.elements.find(element => element.tag === 'column_set').columns;
   assert.equal(columns.length, 2, 'both buttons share one row');
   assert.deepEqual(columns.map(column => column.elements.length), [1, 1]);
+  assert.equal(pagerOf(middle).every(button => button.width === undefined), true, 'no fill inside columns');
 
   const last = buildModelPickerCard({ catalog: many, page: LAST_PAGE });
   assert.deepEqual(pagerOf(last).map(button => button.text.content), ['← 上一页']);
   assert.equal(pagerOf(last).some(button => /下一页/.test(button.text.content)), false, 'a button that leads nowhere is not rendered');
+  assert.equal(last.body.elements.some(element => element.tag === 'column_set'), false);
 });
 
 test('pager buttons carry the page and are not form submits', () => {
