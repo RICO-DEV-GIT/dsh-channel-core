@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildModelPickerCard, readModelPickerAction, conversationalModels, providersOf, modelOptionsOf, OPTIONS_PER_PAGE } from '../lib/model-picker-card.js';
+import { buildModelPickerCard, readModelPickerAction, conversationalModels, providersOf, modelOptionsOf, MAX_OPTIONS } from '../lib/model-picker-card.js';
 
 const catalog = {
   groups: [
@@ -48,17 +48,22 @@ test('every model is listed, not just the first provider', () => {
   assert(values.includes('opencode-go/deepseek-v4-pro'));
 });
 
-test('long lists page instead of overflowing the select', () => {
-  const many = { groups: [{ id: 'ark', models: Array.from({ length: OPTIONS_PER_PAGE * 2 + 3 }, (_, index) => ({ id: 'model-' + index })) }] };
-  const first = buildModelPickerCard({ catalog: many, selected: {} });
-  const form = first.body.elements.find(element => element.tag === 'form');
-  assert.equal(form.elements[0].options.length, OPTIONS_PER_PAGE);
-  assert.equal(form.elements.find(element => element.name === 'dsh_page_next').behaviors[0].value.dsh, 'dsh:model:page:1');
-  const third = buildModelPickerCard({ catalog: many, selected: {}, page: 2 });
-  const thirdForm = third.body.elements.find(element => element.tag === 'form');
-  assert.equal(thirdForm.elements[0].options.length, 3);
-  assert.equal(thirdForm.elements.find(element => element.name === 'dsh_page_next'), undefined);
-  assert.ok(thirdForm.elements.find(element => element.name === 'dsh_page_prev'));
+test('a long list stays in the one select, with no page buttons', () => {
+  const many = { groups: [{ id: 'ark', models: Array.from({ length: 40 }, (_, index) => ({ id: 'model-' + index })) }] };
+  const card = buildModelPickerCard({ catalog: many, selected: {} });
+  const form = card.body.elements.find(element => element.tag === 'form');
+  assert.equal(form.elements[0].options.length, 40, 'every model is offered in the dropdown');
+  assert.equal(form.elements.filter(element => element.name?.startsWith('dsh_page')).length, 0, 'paging was the source of "操作太繁忙"');
+});
+
+test('beyond the option cap the list is trimmed but the current model stays', () => {
+  const many = { groups: [{ id: 'ark', models: Array.from({ length: MAX_OPTIONS + 20 }, (_, index) => ({ id: 'model-' + index })) }] };
+  const last = 'ark/model-' + (MAX_OPTIONS + 10);
+  const card = buildModelPickerCard({ catalog: many, selected: { provider: 'ark', model: 'model-' + (MAX_OPTIONS + 10) } });
+  const form = card.body.elements.find(element => element.tag === 'form');
+  assert.equal(form.elements[0].options.length, MAX_OPTIONS);
+  assert.ok(form.elements[0].options.some(option => option.value === last), 'the current model is never dropped');
+  assert.match(card.body.elements.at(-1).content, /其余用 \/model 提供方\/模型ID 切换/);
 });
 
 test('the switch button posts the chosen model back as a callback', () => {
@@ -79,8 +84,7 @@ test('submissions map back to an intent', () => {
     readModelPickerAction({ token: 'dsh:model:apply', values: { dsh_model: 'ark/doubao-snapshot-pro' } }),
     { kind: 'apply', model: 'ark/doubao-snapshot-pro', provider: 'ark' },
   );
-  assert.deepEqual(readModelPickerAction({ token: 'dsh:model:page:2', values: {} }), { kind: 'page', page: 2, provider: '' });
+  assert.equal(readModelPickerAction({ token: 'dsh:model:page:2', values: {} }), null, 'paging no longer exists');
   assert.equal(readModelPickerAction({ token: 'dsh:answer:1' }), null);
-  assert.equal(readModelPickerAction({ token: 'dsh:model:page:not-a-number' }), null);
   assert.equal(readModelPickerAction({}), null);
 });

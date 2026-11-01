@@ -17,7 +17,8 @@ test('adding the first extra account promotes the v1 file and keeps the existing
   assert.equal(value.accounts['account-2'].workspacePath, workspacePath);
   assert.equal(value.accounts['account-2'].enabled, false, 'a new account waits for its bot instead of connecting empty');
   assert.match(value.accounts['account-2'].appSecretRef, /^FEISHU_APP_SECRET_ACCOUNT_2$/);
-  assert.equal(value.shared.throttleMs, 750);
+  assert.equal(value.accounts['account-2'].throttleMs, 750, 'the new bot carries its own display options');
+  assert.equal(value.shared, undefined, 'display options are no longer shared');
 });
 
 test('a sibling without a workspace is named when it blocks a new account', () => {

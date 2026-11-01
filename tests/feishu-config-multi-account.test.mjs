@@ -13,7 +13,7 @@ test('the v0.8 single-account shape is still valid and unchanged', () => {
   assert.equal(value.workspacePath, 'G:\\DSWork');
 });
 
-test('promoting a v1 config keeps every field and moves display options to shared', () => {
+test('promoting a v1 config keeps every field, display options included', () => {
   const promoted = migrateToMultiAccount(v1(), { accountId: 'default' });
   assert.equal(isMultiAccount(promoted), true);
   assert.equal(promoted.schemaVersion, 2);
@@ -21,9 +21,9 @@ test('promoting a v1 config keeps every field and moves display options to share
   assert.equal(promoted.accounts.default.appId, 'cli_one');
   assert.equal(promoted.accounts.default.enabled, true);
   assert.equal(promoted.accounts.default.workspacePath, 'G:\\DSWork');
-  assert.equal(promoted.shared.throttleMs, 750);
-  assert.equal(promoted.shared.streaming.mode, 'progress');
-  assert.equal(promoted.accounts.default.streaming, undefined, 'streaming lives in shared only');
+  assert.equal(promoted.accounts.default.throttleMs, 750, 'throttle belongs to the bot');
+  assert.equal(promoted.accounts.default.streaming.mode, 'progress', 'display options belong to the bot');
+  assert.equal(promoted.shared, undefined, 'no shared section is written any more');
 });
 
 test('a v2 object validates, defaults the default account and freezes accounts', () => {
@@ -51,20 +51,33 @@ test('v2 rejects the shapes that would make accounts ambiguous', () => {
   assert.throws(() => schema.validate({ schemaVersion: 2, accounts: { 'bad id': { appId: 'x' } } }), /账号 ID/);
   assert.throws(() => schema.validate({ schemaVersion: 2, accounts: { a: { appId: 'x', unknown: 1 } } }), /未知的账号配置项/);
   assert.throws(() => schema.validate({ schemaVersion: 2, accounts: { a: { domain: 'weibo' } } }), /账号配置项无效/);
-  assert.throws(() => schema.validate({ schemaVersion: 2, accounts: { a: {} }, shared: { throttleMs: 99999 } }), /shared.throttleMs/);
+  assert.throws(() => schema.validate({ schemaVersion: 2, accounts: { a: { throttleMs: 99999 } } }), /throttleMs/);
 });
 
-test('an account may not carry shared display options', () => {
-  // Silently dropping them would let an operator believe a per-account setting
-  // took effect; both keys belong to `shared`.
-  assert.throws(
-    () => schema.validate({ schemaVersion: 2, accounts: { a: { appId: 'x', streaming: { mode: 'off' } } } }),
-    /不能单独设置 streaming/,
-  );
-  assert.throws(
-    () => schema.validate({ schemaVersion: 2, accounts: { a: { appId: 'x', throttleMs: 800 } } }),
-    /不能单独设置 throttleMs/,
-  );
+test('display options belong to each bot', () => {
+  const value = schema.validate({
+    schemaVersion: 2,
+    accounts: {
+      a: { appId: 'cli_a', streaming: { mode: 'off' } },
+      b: { appId: 'cli_b', streaming: { mode: 'partial' }, throttleMs: 800 },
+    },
+  });
+  assert.equal(value.accounts.a.streaming.mode, 'off');
+  assert.equal(value.accounts.b.streaming.mode, 'partial');
+  assert.equal(value.accounts.b.throttleMs, 800);
+  assert.equal(value.accounts.a.throttleMs, 750, 'the other bot keeps the default cadence');
+});
+
+test('a legacy shared section is folded into the accounts on read', () => {
+  const value = schema.validate({
+    schemaVersion: 2,
+    accounts: { a: { appId: 'cli_a' }, b: { appId: 'cli_b', throttleMs: 900 } },
+    shared: { streaming: { mode: 'off' }, throttleMs: 500 },
+  });
+  assert.equal(value.accounts.a.streaming.mode, 'off', 'the legacy value is not lost');
+  assert.equal(value.accounts.a.throttleMs, 500);
+  assert.equal(value.accounts.b.throttleMs, 900, 'an explicit value wins over shared');
+  assert.equal(value.shared, undefined, 'the section is not carried forward');
 });
 
 test('account ids are generated without collisions', () => {

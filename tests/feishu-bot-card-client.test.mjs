@@ -119,7 +119,8 @@ test('the server enforces the hard constraints', () => {
   assert(remote.includes('plugin-config/account-bound'), 'C5: a bound account refuses a different bot');
   assert(!remote.includes('replace !== true'), 'C5: there is no replace escape hatch');
   assert(remote.includes('assertWorkspaceDisjoint'), 'C2/C6: binding and saving both validate the workspace');
-  assert(remote.includes('this.assertWorkspace(value ?? {}, id)'), 'C6: saving the form is validated too');
+  assert(remote.includes('this.assertWorkspace(next, id)'), 'C6: saving the form is validated too');
+  assert(remote.includes('withWorkspace(value, id)'), 'a save restores the derived workspace before validating');
 });
 
 test('a failing connection shows the console checklist', () => {

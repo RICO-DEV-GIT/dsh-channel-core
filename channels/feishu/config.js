@@ -60,7 +60,12 @@ const ACCOUNT_FIELDS=Object.freeze({
   workspacePath:'',memoryNamespace:'private',identityLinks:[],ownerMode:'first-dm',ownerUserId:'',
   attachments:true,maxAttachmentMB:10,
 });
-const SHARED_FIELDS=Object.freeze({throttleMs:750});
+/**
+ * Display options belong to the bot, not to the plugin: two bots can legitimately
+ * want different reply formats, and a phone-side toggle must only change the bot
+ * that received it.
+ */
+const ACCOUNT_DISPLAY_FIELDS=Object.freeze({throttleMs:750});
 const ACCOUNT_ID=/^[A-Za-z0-9_-]{1,64}$/;
 
 export function isMultiAccount(value){return Boolean(value)&&typeof value==='object'&&!Array.isArray(value)&&Boolean(value.accounts);}
@@ -70,34 +75,33 @@ function validateAccount(raw,accountId){
   // `accountId` is the map key, `schemaVersion` is the object-level version. Both
   // are dropped silently so a migrated v1 slice validates.
   const {accountId:_ignoredAccountId,schemaVersion:_ignoredVersion,...input}=raw;
-  // Display options are shared, not per account: accepting them here would let an
-  // operator "set" something that silently does nothing.
-  for(const key of ['streaming','throttleMs'])
-    if(Object.hasOwn(input,key))throw new ConfigError('invalid-config','账号「'+accountId+'」不能单独设置 '+key+'，请写在 shared 里');
-  for(const key of Object.keys(input))if(!Object.hasOwn(ACCOUNT_FIELDS,key))throw new ConfigError('invalid-config','未知的账号配置项：'+accountId+'.'+key);
-  const value={...structuredClone(ACCOUNT_FIELDS),...structuredClone(input)};
+  for(const key of Object.keys(input))if(!Object.hasOwn(ACCOUNT_FIELDS,key)&&!Object.hasOwn(ACCOUNT_DISPLAY_FIELDS,key)&&key!=='streaming')
+    throw new ConfigError('invalid-config','未知的账号配置项：'+accountId+'.'+key);
+  const value={...structuredClone(ACCOUNT_FIELDS),...structuredClone(ACCOUNT_DISPLAY_FIELDS),...structuredClone(input)};
+  value.streaming=streaming(Object.hasOwn(input,'streaming')?input.streaming:base.defaults.streaming);
   for(const [key,rule] of Object.entries(ACCOUNT_RULES))if(!rule(value[key],value))throw new ConfigError('invalid-config','账号配置项无效：'+accountId+'.'+key);
+  if(!Number.isSafeInteger(value.throttleMs)||value.throttleMs<400||value.throttleMs>5000)
+    throw new ConfigError('invalid-config','账号配置项无效：'+accountId+'.throttleMs');
   return Object.freeze(value);
 }
 
-function validateShared(raw){
-  if(raw!==undefined&&(raw===null||typeof raw!=='object'||Array.isArray(raw)))throw new ConfigError('invalid-config','shared 必须是对象');
-  const input=raw??{};
-  for(const key of Object.keys(input))if(!Object.hasOwn(SHARED_FIELDS,key)&&key!=='streaming')throw new ConfigError('invalid-config','未知的 shared 配置项：'+key);
-  const value={...structuredClone(SHARED_FIELDS),...structuredClone(input)};
-  value.streaming=streaming(Object.hasOwn(input,'streaming')?input.streaming:base.defaults.streaming);
-  if(!Number.isSafeInteger(value.throttleMs)||value.throttleMs<400||value.throttleMs>5000)throw new ConfigError('invalid-config','配置项取值无效：shared.throttleMs');
-  return Object.freeze(value);
-}
 
 function validateMulti(input){
   // Zero accounts is a legal state: it means "this channel has no bot right now",
   // which is what the page shows after the last bot is deleted.
-  const accounts=Object.entries(input.accounts??{});
+  const rawAccounts=Object.entries(input.accounts??{});
+  // Older files kept display options in `shared`; fold them into every account that
+  // does not set its own, so nothing is lost and the section disappears from new files.
+  const legacy=input.shared&&typeof input.shared==='object'&&!Array.isArray(input.shared)?input.shared:null;
   const checked={};
-  for(const [accountId,raw] of accounts){
+  for(const [accountId,raw] of rawAccounts){
     if(!ACCOUNT_ID.test(accountId))throw new ConfigError('invalid-config','账号 ID 只能包含字母、数字、下划线和短横线：'+accountId);
-    checked[accountId]=validateAccount(raw,accountId);
+    const source=legacy?{
+      ...raw,
+      ...(raw?.streaming===undefined&&legacy.streaming!==undefined?{streaming:legacy.streaming}:{}),
+      ...(raw?.throttleMs===undefined&&legacy.throttleMs!==undefined?{throttleMs:legacy.throttleMs}:{}),
+    }:raw;
+    checked[accountId]=validateAccount(source,accountId);
   }
   const defaultAccount=String(input.defaultAccount??'');
   if(defaultAccount&&!Object.hasOwn(checked,defaultAccount))throw new ConfigError('invalid-config','默认账号不存在：'+defaultAccount);
@@ -105,23 +109,20 @@ function validateMulti(input){
     schemaVersion:2,
     defaultAccount:defaultAccount||Object.keys(checked)[0]||'',
     accounts:Object.freeze(checked),
-    shared:validateShared(input.shared),
   });
 }
 
 /**
- * Turn a v1 flat config into the v2 multi-account shape.
- * The old object becomes `accounts[accountId]`; display/streaming options move to
- * `shared`. Nothing is guessed beyond that.
+ * Turn a v1 flat config into the v2 multi-account shape: the old object becomes
+ * `accounts[accountId]`, display options included, because every bot owns its own.
  */
 export function migrateToMultiAccount(v1,{accountId='default'}={}){
   const flat=base.validate({...v1,streaming:streaming(v1?.streaming??base.defaults.streaming)});
-  const {streaming:streamValue,throttleMs,schemaVersion:_version,accountId:_legacyId,...rest}=flat;
+  const {schemaVersion:_version,accountId:_legacyId,...rest}=flat;
   return validateMulti({
     schemaVersion:2,
     defaultAccount:accountId,
     accounts:{[accountId]:rest},
-    shared:{streaming:streamValue,throttleMs},
   });
 }
 
