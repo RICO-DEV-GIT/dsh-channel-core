@@ -610,9 +610,13 @@ export async function createTransport({config,credentials,signal,receive,state,d
           }
           return sent;
         }catch(error){
-          cardNotice('模型选择卡片发送失败，已改用文本：'+(error?.code??error?.status??error?.message??'unknown'),error?.code);
+          const reason=String(error?.code??error?.status??error?.message??'unknown');
+          cardNotice('模型选择卡片发送失败，已改用文本：'+reason,error?.code);
+          // Put the reason in the message itself: a rejected card is a bug report, and
+          // the person who can see it is the operator, not the log file.
+          const head='⚠️ 模型卡片发送失败（'+reason+'），已改用文本。\n\n';
           const fallback=String(body.text??'').trim();
-          return channel.send(origin.conversationId,{text:fallback||'模型卡片暂不可用，请稍后重试。'},sendOptions(origin));
+          return channel.send(origin.conversationId,{text:head+(fallback||'模型卡片暂不可用，请稍后重试。')},sendOptions(origin));
         }
       }
       // `auto` means: a private chat is read on a phone, so deliver the answer as

@@ -18,8 +18,8 @@ const catalog = {
 };
 
 const formOf = card => card.body.elements.find(element => element.tag === 'form');
-// The pager lives in its own `action` block, outside the form.
-const pageButtons = card => (card.body.elements.find(element => element.tag === 'action')?.actions ?? []);
+// The pager is part of the same form as the select.
+const pageButtons = card => formOf(card).elements.filter(element => element.name?.startsWith('dsh_page'));
 
 test('non-chat models are filtered out of the picker', () => {
   const ark = providersOf(catalog).find(group => group.id === 'ark');
@@ -34,7 +34,8 @@ test('one page is one form with one select and a switch button', () => {
   assert.equal(select.tag, 'select_static');
   assert.equal(select.name, 'dsh_model');
   assert.equal(select.options.length, 4, 'all four conversational models fit on one page');
-  assert.equal(select.initial_option, 'opencode-go/deepseek-v4.1-flash');
+  assert.equal(select.initial_option, undefined, 'no initial_option: card 2.0 rejects it in some tenants');
+  assert.match(card.body.elements[0].content, /当前模型：\*\*opencode-go\/deepseek-v4\.1-flash\*\*/, 'the current model is stated in the header instead');
   assert.equal(pageButtons(card).length, 0, 'no paging when everything fits');
   assert.match(card.body.elements.at(-1).content, /共 4 个可对话模型/);
 });
