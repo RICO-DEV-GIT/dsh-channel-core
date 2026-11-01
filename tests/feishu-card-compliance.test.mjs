@@ -24,6 +24,8 @@ const CARDS = {
     ] },
     page: 1,
   },
+  // 全量下拉：无标题栏，下拉与 切换 并排在表单的分栏里。
+  'all: full catalog dropdown': { catalog: { groups: [{ id: 'p', models: Array.from({ length: 60 }, (_, i) => ({ id: 'm-' + i })) }] }, page: 0, mode: 'all' },
   // The checker layout has its own component set (checker rows + a form holding a
   // column_set of pager buttons), so it needs its own compliance fixtures.
   'checker: first page': { catalog: { groups: [{ id: 'p', models: Array.from({ length: 30 }, (_, i) => ({ id: 'm-' + i })) }] }, page: 0, mode: 'checker' },
@@ -86,12 +88,14 @@ function checkCard(card, where) {
   if (card.config?.width_mode !== undefined && !['default', 'compact', 'fill'].includes(card.config.width_mode)) fail('config.width_mode invalid');
   if (card.config?.enable_forward !== undefined && typeof card.config.enable_forward !== 'boolean') fail('config.enable_forward must be boolean');
 
-  // header: title required; template enum.
+  // header is optional: the 全量下拉 card deliberately has no title bar.
   for (const key of Object.keys(card.header ?? {})) if (!HEADER_KEYS.includes(key)) fail('unknown header key ' + key);
-  if (!card.header?.title) fail('header.title missing');
-  if (!['plain_text', 'lark_md'].includes(card.header?.title?.tag)) fail('header.title.tag invalid');
-  if (!card.header?.title?.content) fail('header.title.content empty');
-  if (!TEMPLATES.includes(card.header?.template)) fail('header.template not in enum: ' + card.header?.template);
+  if (card.header) {
+    if (!card.header.title) fail('header.title missing');
+    if (card.header.title && !['plain_text', 'lark_md'].includes(card.header.title.tag)) fail('header.title.tag invalid');
+    if (card.header.title && !card.header.title.content) fail('header.title.content empty');
+    if (card.header.template !== undefined && !TEMPLATES.includes(card.header.template)) fail('header.template not in enum: ' + card.header.template);
+  }
 
   // body: documented keys only, elements array.
   for (const key of Object.keys(card.body ?? {})) if (!BODY_KEYS.includes(key)) fail('unknown body key ' + key);
@@ -192,7 +196,14 @@ function checkCard(card, where) {
       } else if (node.tag === 'form') {
         if (depth > 1) fail(at + ' form must be at the card root');
         if (!node.name) fail(at + ' form needs name');
-        const buttons = (node.elements ?? []).filter(child => child?.tag === 'button');
+        // A submit button may sit directly in the form or inside a column_set in it
+        // (the official example puts 提交/取消 in columns).
+        const collectButtons = elements => (elements ?? []).flatMap(child => {
+          if (child?.tag === 'button') return [child];
+          if (child?.tag === 'column_set') return (child.columns ?? []).flatMap(column => collectButtons(column.elements));
+          return [];
+        });
+        const buttons = collectButtons(node.elements);
         if (!buttons.some(button => button.form_action_type === 'submit')) fail(at + ' form needs a submit button');
         walk(node.elements ?? [], at + '.elements', depth + 1, true);
       } else if (node.tag === 'column_set') {

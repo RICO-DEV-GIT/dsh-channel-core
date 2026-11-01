@@ -15,19 +15,38 @@ const catalogOf = count => ({
 });
 
 const formOf = card => card.body.elements.find(element => element.tag === 'form');
-const selectOf = card => formOf(card)?.elements?.find?.(element => element.tag === 'select_static');
+// C 布局：下拉与「切换」并排放在表单内的分栏里。
+const selectOf = card => {
+  const form = formOf(card);
+  if (!form) return undefined;
+  const direct = form.elements.find(element => element.tag === 'select_static');
+  if (direct) return direct;
+  return (form.elements.find(element => element.tag === 'column_set')?.columns ?? [])
+    .flatMap(column => column.elements ?? [])
+    .find(element => element.tag === 'select_static');
+};
 
-test('every model is in one dropdown, with 切换 and no pager', () => {
+test('every model is in one dropdown, with 切换 beside it and no pager', () => {
   const card = buildModelPickerCard({ catalog: catalogOf(135), mode: 'all' });
   const select = selectOf(card);
   assert.ok(select, 'the card holds a dropdown');
   assert.equal(select.options.length, 135, 'all models, no paging');
   assert.equal(card.body.elements.some(element => element.tag === 'checker'), false);
-  assert.equal(card.body.elements.some(element => element.tag === 'column_set'), false, 'no pager row');
-  assert.deepEqual(formOf(card).elements.map(element => element.tag), ['select_static', 'button']);
-  assert.equal(formOf(card).elements[1].text.content, '切换');
+  // 下拉与 切换 并排一行（C 布局），表单里只有一个 column_set。
+  assert.deepEqual(formOf(card).elements.map(element => element.tag), ['column_set'], '一行：下拉 + 切换');
+  const row = formOf(card).elements[0].columns.flatMap(column => column.elements);
+  assert.deepEqual(row.map(element => element.tag), ['select_static', 'button']);
+  assert.equal(row[1].text.content, '切换');
   assert.equal(select.required, false, 'required would block the submit button');
   assert.equal(select.initial_index, 0, 'the box must not pretend an option was chosen');
+  assert.equal(select.width, 'fill', 'the dropdown takes the column width');
+});
+
+test('the card has no title bar and keeps the current-model line and the footer', () => {
+  const card = buildModelPickerCard({ catalog: catalogOf(20), mode: 'all', selected: { provider: 'ark', model: 'x' } });
+  assert.equal(card.header, undefined, '标题「切换模型」已删除');
+  assert.match(card.body.elements[0].content, /当前模型：\*\*ark\/x\*\*/);
+  assert.match(card.body.elements.at(-1).content, /共 20 个可对话模型/);
 });
 
 test('the dropdown says how many models it holds', () => {
