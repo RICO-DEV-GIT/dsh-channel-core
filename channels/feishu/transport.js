@@ -388,7 +388,9 @@ export async function createTransport({config,credentials,signal,receive,state,d
           try{await channel.updateCard(event.messageId,result.card);}
           catch{/* the card was recalled: report instead of throwing */ return {toast:{type:'error',content:'卡片已失效，请重新发送 /model。'}};}
         }
-        return {toast:result?.toast??{type:'info',content:'已更新'}};
+        // `toast: null` means "nothing to say" (a debounced double tap): returning an
+        // empty toast would render an empty bubble on the phone.
+        return result?.toast?{toast:result.toast}:{};
       }catch(error){
         return {toast:{type:'error',content:'切换失败：'+(error?.message??'未知原因')}};
       }

@@ -18,7 +18,8 @@ const catalog = {
 };
 
 const formOf = card => card.body.elements.find(element => element.tag === 'form');
-const pageButtons = card => formOf(card).elements.filter(element => element.name?.startsWith('dsh_page'));
+// The pager lives in its own `action` block, outside the form.
+const pageButtons = card => (card.body.elements.find(element => element.tag === 'action')?.actions ?? []);
 
 test('non-chat models are filtered out of the picker', () => {
   const ark = providersOf(catalog).find(group => group.id === 'ark');
