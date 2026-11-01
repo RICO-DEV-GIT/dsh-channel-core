@@ -38,6 +38,14 @@ test('every model is reachable across pages', () => {
   assert(values.includes('opencode-go/deepseek-v4-pro'));
 });
 
+test('the select is optional, so a pager button can fire without a selection', () => {
+  // Feishu blocks a form button while a required field is empty; the paging buttons
+  // did nothing until this flag was set (the tap never reached the Host).
+  const card = buildModelPickerCard({ catalog: many });
+  assert.equal(selectOf(card).required, false);
+  assert.equal(selectOf(card).name, 'dsh_model');
+});
+
 test('one page is one form: a select plus 切换, and no pager when it all fits', () => {
   const card = buildModelPickerCard({ catalog, selected: { provider: 'opencode-go', model: 'deepseek-v4.1-flash' } });
   assert.equal(card.body.elements.filter(element => element.tag === 'form').length, 1);
