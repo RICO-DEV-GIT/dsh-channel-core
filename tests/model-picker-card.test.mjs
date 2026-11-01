@@ -60,12 +60,14 @@ test('the current model is listed first, because the phone collapses the dropdow
   assert.equal(selectOf(card).options.length, 4, 'reordering must not duplicate it');
 });
 
+const LAST_PAGE = pageCountOf(many) - 1;
+
 test('paging is done with buttons, never with dropdown entries', () => {
   const first = buildModelPickerCard({ catalog: many });
   assert.deepEqual(labels(first), ['切换', '下一页'], 'first page offers only 下一页');
   const middle = buildModelPickerCard({ catalog: many, page: 1 });
   assert.deepEqual(labels(middle), ['切换', '上一页', '下一页']);
-  const last = buildModelPickerCard({ catalog: many, page: 2 });
+  const last = buildModelPickerCard({ catalog: many, page: LAST_PAGE });
   assert.deepEqual(labels(last), ['切换', '上一页'], 'last page offers only 上一页');
   // A dropdown entry comes back as a remembered *selection* on the next render, which is
   // what made the card say page 1 while showing "→ 下一页" as the chosen value.
@@ -74,15 +76,16 @@ test('paging is done with buttons, never with dropdown entries', () => {
   }
 });
 
-test('a long list pages twenty at a time and never loses a model', () => {
-  assert.equal(pageCountOf(many), 3);
+test('a long list pages ten at a time and never loses a model', () => {
+  assert.equal(PAGE_SIZE, 10, 'ten options fit one phone screen');
+  assert.equal(pageCountOf(many), Math.ceil(45 / PAGE_SIZE));
   assert.equal(selectOf(buildModelPickerCard({ catalog: many })).options.length, PAGE_SIZE);
   const seen = new Set();
   for (let page = 0; page < pageCountOf(many); page += 1) {
     for (const option of selectOf(buildModelPickerCard({ catalog: many, page })).options) seen.add(option.value);
   }
   assert.equal(seen.size, 45, 'every model appears exactly once');
-  assert.equal(selectOf(buildModelPickerCard({ catalog: many, page: 2 })).options.length, 5, 'the last page holds the remainder');
+  assert.equal(selectOf(buildModelPickerCard({ catalog: many, page: LAST_PAGE })).options.length, 45 - LAST_PAGE * PAGE_SIZE, 'the last page holds the remainder');
 });
 
 test('the pager buttons carry the page in their token', () => {
@@ -100,8 +103,8 @@ test('only digit-only page tokens are accepted', () => {
 
 test('a switch lands on the page holding the chosen model', () => {
   assert.equal(pageOfModel(many, 'ark/model-0'), 0);
-  assert.equal(pageOfModel(many, 'ark/model-25'), 1);
-  assert.equal(pageOfModel(many, 'ark/model-44'), 2);
+  assert.equal(pageOfModel(many, 'ark/model-25'), 2);
+  assert.equal(pageOfModel(many, 'ark/model-44'), 4);
   assert.equal(pageOfModel(many, 'ark/missing'), 0);
 });
 
