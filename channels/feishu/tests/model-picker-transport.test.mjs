@@ -53,9 +53,10 @@ test('a tap re-renders the card for the Session the card belongs to', async () =
     const reply = await tapModel(f.listeners, { dsh_provider: 'ark', dsh_model: 'ark/model-x' });
     assert.deepEqual(seen, [{ sessionId: 'session-a', action: { kind: 'apply', provider: 'ark', model: 'ark/model-x' } }]);
     assert.equal(reply.toast.content, '已切换模型');
-    const update = f.calls.find(call => call.type === 'update');
-    assert.equal(update.id, 'card-1');
-    assert.deepEqual(update.payload, card);
+    // The new card travels in the callback response — the documented way to update a card
+    // from an interaction. Calling the update API afterwards never changed anything.
+    assert.deepEqual(reply.card, { type: 'raw', data: card });
+    assert.equal(f.calls.filter(call => call.type === 'update').length, 0, 'no separate update call');
   } finally { await t.close(); }
 });
 

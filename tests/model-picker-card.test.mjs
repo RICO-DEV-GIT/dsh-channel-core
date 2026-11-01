@@ -21,18 +21,13 @@ const catalog = {
 };
 
 const many = { groups: [{ id: 'ark', models: Array.from({ length: 45 }, (_, index) => ({ id: 'model-' + index })) }] };
+const LAST_PAGE = pageCountOf(many) - 1;
+
 const formOf = card => card.body.elements.find(element => element.tag === 'form');
 const selectOf = card => formOf(card).elements.find(element => element.tag === 'select_static');
-const buttonsOf = card => formOf(card).elements.filter(element => element.tag === 'button');
-// The temporary 🔍 测试 probe is not part of the paging contract.
-const realButtons = card => buttonsOf(card).filter(button => button.name !== 'dsh_probe');
-const labels = card => realButtons(card).map(button => button.text.content);
-
-test('the temporary probe button is present while diagnostics are on', () => {
-  assert.equal(INCLUDE_PROBE, true);
-  const probe = buttonsOf(buildModelPickerCard({ catalog })).find(button => button.name === 'dsh_probe');
-  assert.equal(probe?.behaviors[0].value.dsh, 'dsh:model:probe');
-});
+const formButtons = card => formOf(card).elements.filter(element => element.tag === 'button');
+const pagerOf = card => (card.body.elements.find(element => element.tag === 'column_set')?.columns ?? [])
+  .flatMap(column => column.elements ?? []);
 
 test('non-chat models are filtered out of the picker', () => {
   const ark = providersOf(catalog).find(group => group.id === 'ark');
@@ -46,66 +41,70 @@ test('every model is reachable across pages', () => {
   assert(values.includes('opencode-go/deepseek-v4-pro'));
 });
 
-test('the select is optional, so a pager button can fire without a selection', () => {
-  // Feishu blocks a form button while a required field is empty; the paging buttons
-  // did nothing until this flag was set (the tap never reached the Host).
+test('the probe is off and the card asks to be updatable', () => {
+  assert.equal(INCLUDE_PROBE, false, 'diagnostics are done');
   const card = buildModelPickerCard({ catalog: many });
-  assert.equal(selectOf(card).required, false);
-  assert.equal(selectOf(card).name, 'dsh_model');
+  assert.deepEqual(card.config, { wide_screen_mode: true, update_multi: true });
 });
 
-test('one page is one form: a select plus 切换, and no pager when it all fits', () => {
+test('one page keeps a single form: select + 切换, no pager when it all fits', () => {
   const card = buildModelPickerCard({ catalog, selected: { provider: 'opencode-go', model: 'deepseek-v4.1-flash' } });
   assert.equal(card.body.elements.filter(element => element.tag === 'form').length, 1);
-  assert.deepEqual(labels(card), ['切换'], 'no pager on a single page');
+  assert.deepEqual(formButtons(card).map(button => button.text.content), ['切换']);
   assert.equal(selectOf(card).options.length, 4);
+  assert.equal(pagerOf(card).length, 0);
   assert.match(card.body.elements[0].content, /当前模型：\*\*opencode-go\/deepseek-v4\.1-flash\*\*/);
 });
 
-test('the current model is listed first, because the phone collapses the dropdown onto it', () => {
+test('the select shows no initial option; the header states the real model', () => {
   const card = buildModelPickerCard({ catalog, selected: { provider: 'ark', model: 'doubao-snapshot-pro' } });
-  assert.equal(selectOf(card).options[0].value, 'ark/doubao-snapshot-pro');
-  assert.equal(selectOf(card).options.length, 4, 'reordering must not duplicate it');
+  assert.equal(selectOf(card).initial_index, 0);
+  assert.equal(selectOf(card).required, false);
+  assert.match(card.body.elements[0].content, /\*\*ark\/doubao-snapshot-pro\*\*/);
+  assert.equal(selectOf(card).options[0].value, 'ark/doubao-snapshot-pro', 'the current model is listed first');
 });
 
-const LAST_PAGE = pageCountOf(many) - 1;
-
-test('paging is done with buttons, never with dropdown entries', () => {
+test('paging is one row of buttons outside the form; first page has no 上一页, last none 下一页', () => {
   const first = buildModelPickerCard({ catalog: many });
-  assert.deepEqual(labels(first), ['切换', '下一页'], 'first page offers only 下一页');
+  assert.deepEqual(pagerOf(first).map(button => button.text.content), ['下一页 →']);
+  assert.equal(formButtons(first).length, 1, 'the form still only holds 切换');
+
   const middle = buildModelPickerCard({ catalog: many, page: 1 });
-  assert.deepEqual(labels(middle), ['切换', '上一页', '下一页']);
+  assert.deepEqual(pagerOf(middle).map(button => button.text.content), ['← 上一页', '下一页 →']);
+  const columns = middle.body.elements.find(element => element.tag === 'column_set').columns;
+  assert.equal(columns.length, 2, 'both buttons share one row');
+  assert.deepEqual(columns.map(column => column.elements.length), [1, 1]);
+
   const last = buildModelPickerCard({ catalog: many, page: LAST_PAGE });
-  assert.deepEqual(labels(last), ['切换', '上一页'], 'last page offers only 上一页');
-  // A dropdown entry comes back as a remembered *selection* on the next render, which is
-  // what made the card say page 1 while showing "→ 下一页" as the chosen value.
-  for (const card of [first, middle, last]) {
-    assert.equal(selectOf(card).options.filter(option => !option.value.includes('/')).length, 0);
+  assert.deepEqual(pagerOf(last).map(button => button.text.content), ['← 上一页']);
+  assert.equal(pagerOf(last).some(button => /下一页/.test(button.text.content)), false, 'a button that leads nowhere is not rendered');
+});
+
+test('pager buttons carry the page and are not form submits', () => {
+  const middle = buildModelPickerCard({ catalog: many, page: 1 });
+  const tokens = pagerOf(middle).map(button => button.behaviors[0].value.dsh);
+  assert.deepEqual(tokens, ['dsh:model:page:0', 'dsh:model:page:2']);
+  for (const button of pagerOf(middle)) {
+    assert.equal(button.form_action_type, undefined, 'outside the form, so no submit behaviour');
+    assert.equal(button.behaviors[0].type, 'callback');
   }
 });
 
 test('a long list pages ten at a time and never loses a model', () => {
-  assert.equal(PAGE_SIZE, 10, 'ten options fit one phone screen');
+  assert.equal(PAGE_SIZE, 10);
   assert.equal(pageCountOf(many), Math.ceil(45 / PAGE_SIZE));
-  assert.equal(selectOf(buildModelPickerCard({ catalog: many })).options.length, PAGE_SIZE);
   const seen = new Set();
   for (let page = 0; page < pageCountOf(many); page += 1) {
     for (const option of selectOf(buildModelPickerCard({ catalog: many, page })).options) seen.add(option.value);
   }
   assert.equal(seen.size, 45, 'every model appears exactly once');
-  assert.equal(selectOf(buildModelPickerCard({ catalog: many, page: LAST_PAGE })).options.length, 45 - LAST_PAGE * PAGE_SIZE, 'the last page holds the remainder');
+  assert.equal(selectOf(buildModelPickerCard({ catalog: many, page: LAST_PAGE })).options.length, 45 - LAST_PAGE * PAGE_SIZE);
 });
 
-test('the pager buttons carry the page in their token', () => {
-  const middle = buildModelPickerCard({ catalog: many, page: 1 });
-  const tokens = realButtons(middle).map(button => button.behaviors[0].value.dsh);
-  assert.deepEqual(tokens, ['dsh:model:apply', 'dsh:model:page:0', 'dsh:model:page:2']);
+test('page tokens must be digits', () => {
   assert.deepEqual(readModelPickerAction({ token: 'dsh:model:page:2' }), { kind: 'page', page: 2, provider: '' });
-});
-
-test('only digit-only page tokens are accepted', () => {
   for (const token of ['dsh:model:page:-1', 'dsh:model:page:x', 'dsh:model:page:1.5', 'dsh:model:page:', 'dsh:model:page']) {
-    assert.equal(readModelPickerAction({ token }), null, token + ' must not be read as a page');
+    assert.equal(readModelPickerAction({ token }), null, token);
   }
 });
 
