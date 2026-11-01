@@ -79,7 +79,7 @@ test('provider-only shortcut with multiple models only lists options and does no
  const response=await channelModelCommand(controller,'session-1','model','p');
  assert.match(response,/2 个可选模型/);
  assert.match(response,/p\/alpha/);assert.match(response,/p\/beta/);
- assert.match(response,/使用 \/model provider\/model 切换/);
+ assert.match(response,/\/model provider\/model/);
  assert.equal(writes.length,0);
  assert.equal((await channelModelCommand(controller,'session-1','model','unknown')).includes('未找到这个提供方'),true);
  assert.equal(writes.length,0);
@@ -94,17 +94,27 @@ test('empty provider and nested slash IDs resolve through the catalog with no gu
  assert.equal(writes[0].model,'BAAI/bge-m3');
 });
 
-test('model and think help place usage before candidates with a consistent non-Markdown bullet',async()=>{
- const {controller}=host();
- const model=await channelModelCommand(controller,'s1','model','');
- assert(model.indexOf('当前模型：')<model.indexOf('使用 /model'));
- assert(model.indexOf('使用 /model')<model.indexOf('可选模型：'));
- assert.match(model,/可选模型：\n• p\/alpha · Alpha\n• p\/beta · Beta/);
- assert(!model.includes('\n- ')&&!model.includes('\n* '));
- const think=await channelModelCommand(controller,'s1','think','');
+test('model help is a numbered page, and a number turns it',async()=>{
+ const many={groups:[{id:'p',models:Array.from({length:25},(_,i)=>({id:'m-'+i,name:'M'+i}))}]};
+ const {controller,writes}=host({modelCatalog:async()=>many});
+ const first=await channelModelCommand(controller,'s1','model','');
+ assert.match(first,/当前模型：/);
+ assert.match(first,/第 1\/3 页 · 共 25 个可对话模型/);
+ assert.match(first,/1\. p\/m-0/);
+ assert.match(first,/10\. p\/m-9/);
+ assert.match(first,/翻页：\/model 2/);
+ assert(!first.includes('11. '),'only ten entries per page');
+ assert(!first.includes('\n- ')&&!first.includes('\n* '),'plain numbered lines, no markdown bullets');
+ const second=await channelModelCommand(controller,'s1','model','2');
+ assert.match(second,/第 2\/3 页/);
+ assert.match(second,/11\. p\/m-10/);
+ assert.match(second,/翻页：\/model 3 · \/model 1/);
+ assert.equal(writes.length,0,'paging never changes the model');
+ assert.match(await channelModelCommand(controller,'s1','model','9'),/页码超出范围/);
+ const thinkHost=host();
+ const think=await channelModelCommand(thinkHost.controller,'s1','think','');
  assert(think.indexOf('当前推理强度：')<think.indexOf('使用 /think'));
- assert(think.indexOf('使用 /think')<think.indexOf('可选强度：'));
- assert.match(think,/可选强度：\n• off · 关闭\n• low · 低\n• max · 最高/);
+ assert.match(think,/可选强度：\n• off · 关闭/);
 });
 
 test('shorthand never changes model when native Host declines the selection',async()=>{

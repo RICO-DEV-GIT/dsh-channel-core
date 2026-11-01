@@ -11,6 +11,7 @@ import { verifyQueuedFile } from '../../lib/outbound-file.js';
 import { buildBotCard } from '../../lib/bot-card.js';
 import { channelHint } from '../../lib/channel-hints.js';
 import { readModelPickerAction } from '../../lib/model-picker-card.js';
+import { recordModelCardTap } from '../../lib/model-card-diagnostics.js';
 
 const imageExtension=head=>{
   if(head.length>=12&&head.toString('latin1',0,4)==='RIFF'&&head.toString('latin1',8,12)==='WEBP')return 'webp';
@@ -377,31 +378,49 @@ export async function createTransport({config,credentials,signal,receive,state,d
     const token=event?.action?.value?.dsh;
     if(signal.aborted)return {toast:{type:'error',content:'渠道正在重连，请稍后重试。'}};
     if(typeof token!=='string'||!token)return {toast:{type:'error',content:'按钮缺少有效操作信息，请重新发起提问。'}};
+    const tapForm=event.raw?.action?.form_value??event.action?.form_value;
+    const tapFields=tapForm&&typeof tapForm==='object'?Object.keys(tapForm).join(','):'（无）';
+    const tapModel=tapForm&&typeof tapForm==='object'?String(tapForm.dsh_model??'（空）'):'（空）';
     // Diagnostic probe: report exactly what the platform delivered for this tap, so a
     // dead button can be diagnosed (no callback / no token / token but no card) instead
     // of guessed. Temporary; removed once the paging path is confirmed.
     if(token==='dsh:model:probe'){
-      const form=event.raw?.action?.form_value??event.action?.form_value;
-      const fields=form&&typeof form==='object'?Object.keys(form).join(','):'（无）';
-      const model=form&&typeof form==='object'?String(form.dsh_model??'（空）'):'（空）';
       const known=modelCards.has(event.messageId)?'是':'否';
-      return {toast:{type:'info',content:'探针：回调已到达｜token='+token+'｜表单字段='+fields+'｜模型值='+model+'｜卡片已登记='+known}};
+      recordModelCardTap({token,formKeys:tapFields,modelValue:tapModel,registered:known,outcome:'探针'});
+      return {toast:{type:'info',content:'探针：回调已到达｜token='+token+'｜表单字段='+tapFields+'｜模型值='+tapModel+'｜卡片已登记='+known}};
     }
     // Model picker taps are host-side state changes, not Ask User answers.
-    const modelIntent=readModelPickerAction({token,values:(event.raw?.action?.form_value??event.action?.form_value)??undefined});
+    const modelIntent=readModelPickerAction({token,values:tapForm??undefined});
     if(modelIntent){
       const record=modelCards.get(event.messageId);
-      if(!record)return {toast:{type:'error',content:'这张卡片已失效，请重新发送 /model。'}};
+      if(!record){
+        recordModelCardTap({token,formKeys:tapFields,modelValue:tapModel,registered:'否',outcome:'卡片未登记'});
+        return {toast:{type:'error',content:'这张卡片已失效，请重新发送 /model。'}};
+      }
       try{
         const result=await host?.modelPicker?.({sessionId:record.sessionId,action:modelIntent});
+        let outcome='无卡片变更';
         if(result?.card){
-          try{await channel.updateCard(event.messageId,result.card);}
-          catch(error){/* the card was recalled, or the update itself is refused: say which */ return {toast:{type:'error',content:'卡片更新失败（'+(error?.code??error?.message??'未知')+'），请重新发送 /model。'}};}
+          try{
+            await channel.updateCard(event.messageId,result.card);
+            outcome='原地更新成功';
+          }catch(error){
+            // The update was refused: fall back to sending the new card as a message, so
+            // the operator still sees the new state instead of a dead button.
+            const code=error?.code??error?.status??error?.message??'未知';
+            outcome='原地更新失败('+code+')';
+            try{
+              const sent=await channel.send(event.chatId,{card:result.card},sendOptions({messageId:event.messageId,threadId:event.threadId}));
+              if(sent?.messageId){modelCards.set(sent.messageId,{sessionId:record.sessionId});outcome+='，已改发新卡';}
+            }catch(sendError){outcome+='，改发也失败('+(sendError?.code??sendError?.message??'未知')+')';}
+          }
         }
+        recordModelCardTap({token,formKeys:tapFields,modelValue:tapModel,registered:'是',outcome});
         // `toast: null` means "nothing to say" (a debounced double tap): returning an
         // empty toast would render an empty bubble on the phone.
         return result?.toast?{toast:result.toast}:{};
       }catch(error){
+        recordModelCardTap({token,formKeys:tapFields,modelValue:tapModel,registered:'是',outcome:'宿主失败:'+(error?.message??'未知')});
         return {toast:{type:'error',content:'切换失败：'+(error?.message??'未知原因')}};
       }
     }

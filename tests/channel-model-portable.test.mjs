@@ -14,11 +14,16 @@ test('multi-model provider and unknown id do not mutate the Session',async()=>{
  assert.match(await channelModelCommand(a.controller,'s','model','bad'),/未找到/);
  assert.equal(a.writes.length,0);
 });
-test('help puts command usage before candidates with stable plain-text bullets',async()=>{
+test('help is a numbered page, and think keeps plain-text bullets',async()=>{
  const a=host(),model=await channelModelCommand(a.controller,'s','model',''),think=await channelModelCommand(a.controller,'s','think','');
- assert(model.indexOf('使用 /model')<model.indexOf('可选模型：'));
+ // /model answers with a numbered page: the current model, then ten short lines.
+ assert(model.indexOf('当前模型：')<model.indexOf('第 1/'));
+ assert(model.includes('1. go/flash'));
+ assert(model.includes('2. other/pro'));
+ assert.match(model,/切换：\/model 提供方\/模型ID/);
+ // /think is unchanged: usage before the strengths, plain bullets.
  assert(think.indexOf('使用 /think')<think.indexOf('可选强度：'));
- assert(model.includes('• go/flash · Flash'));assert(think.includes('• max · Max'));
+ assert(think.includes('• max · Max'));
 });
 test('unpublished reasoning strengths are not applied',async()=>{
  const a=host();
