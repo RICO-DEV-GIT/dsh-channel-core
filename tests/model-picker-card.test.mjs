@@ -100,8 +100,11 @@ test('paging sits outside the form; first page has no 上一页, last none 下�
   const first = buildModelPickerCard({ catalog: many });
   assert.deepEqual(pagerOf(first).map(button => button.text.content), ['下一页 →']);
   assert.equal(formButtons(first).length, 1, 'the form still only holds 切换');
-  assert.equal(first.body.elements.some(element => element.tag === 'column_set'), false);
-  assert.equal(pagerOf(first)[0].width, 'fill');
+  // Every pager button is nested in a column_set, even the lone one: a bare body-level
+  // button is the shape that is least certain to render.
+  const firstColumns = first.body.elements.find(element => element.tag === 'column_set').columns;
+  assert.equal(firstColumns.length, 1, 'one column, no empty placeholder');
+  assert.equal(firstColumns[0].elements.length, 1);
 
   const middle = buildModelPickerCard({ catalog: many, page: 1 });
   assert.deepEqual(pagerOf(middle).map(button => button.text.content), ['← 上一页', '下一页 →']);
@@ -112,7 +115,6 @@ test('paging sits outside the form; first page has no 上一页, last none 下�
   const last = buildModelPickerCard({ catalog: many, page: LAST_PAGE });
   assert.deepEqual(pagerOf(last).map(button => button.text.content), ['← 上一页']);
   assert.equal(pagerOf(last).some(button => /下一页/.test(button.text.content)), false, 'a button that leads nowhere is not rendered');
-  assert.equal(last.body.elements.some(element => element.tag === 'column_set'), false);
 });
 
 test('pager buttons carry the page and are not form submits', () => {
