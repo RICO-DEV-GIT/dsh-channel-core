@@ -396,7 +396,9 @@ export async function createTransport({config,credentials,signal,receive,state,d
         return {toast:{type:'error',content:'这张卡片已失效，请重新发送 /model。'}};
       }
       try{
+        const started=Date.now();
         const result=await host?.modelPicker?.({sessionId:record.sessionId,action:modelIntent});
+        const hostMs=Date.now()-started;
         // A tap can change the card only through the API: this SDK discards card-action
         // responses entirely. `im.v1.message.patch` answers 200 but the client keeps showing
         // the old card (verified on the device: seven taps, seven "successful" patches, no
@@ -405,14 +407,20 @@ export async function createTransport({config,credentials,signal,receive,state,d
         let outcome='无卡片变更';
         if(result?.card){
           try{
+            const sentAt=Date.now();
             const sent=await channel.send(event.chatId,{card:result.card},sendOptions({messageId:event.messageId,threadId:event.threadId}));
-            outcome='新卡已发送';
+            const sendMs=Date.now()-sentAt;
+            outcome='新卡已发送（宿主 '+hostMs+'ms · 发送 '+sendMs+'ms）';
             if(sent?.messageId){
               modelCards.set(sent.messageId,{sessionId:record.sessionId});
               if(modelCards.size>32)modelCards.delete(modelCards.keys().next().value);
             }
-            try{await channel.recallMessage(event.messageId);outcome='新卡已发送，旧卡已撤回';}
-            catch{/* recall is best effort: the new card already carries the state */ }
+            // Recall in the background: waiting for it would add a round trip to every tap,
+            // and the new card already shows the current state.
+            Promise.resolve()
+              .then(()=>channel.recallMessage(event.messageId))
+              .catch(()=>{});
+            outcome+='，旧卡撤回中';
           }catch(error){
             const code=error?.code??error?.status??error?.message??'未知';
             outcome='发卡失败('+code+')';

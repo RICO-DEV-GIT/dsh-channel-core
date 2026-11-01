@@ -632,28 +632,28 @@
         "group": "会话与输入",
         "label": "模型卡片样式",
         "type": "select",
-        "labels": {
-          "checker": "勾选器（无下拉，翻页一行）",
-          "dropdown": "下拉（翻页在列表里）"
-        },
         "help": "勾选器样式下，每个模型是一行勾选框，翻页按钮单独一行。",
-        "advanced": false
+        "advanced": false,
+        "options": [
+          [
+            "checker",
+            "勾选器（无下拉，翻页一行）"
+          ],
+          [
+            "dropdown",
+            "下拉（翻页在列表里）"
+          ]
+        ]
       },
       {
         "key": "modelPageSize",
         "group": "会话与输入",
         "label": "每页模型数",
-        "type": "select",
-        "labels": {
-          "4": "4",
-          "5": "5",
-          "6": "6",
-          "8": "8",
-          "10": "10"
-        },
-        "numeric": true,
+        "type": "number",
         "help": "勾选器一页显示多少个模型（4–10）。",
-        "advanced": false
+        "advanced": false,
+        "min": 4,
+        "max": 10
       },
       {
         "key": "agentPreset",
