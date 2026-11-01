@@ -92,6 +92,14 @@ test('the bot list offers only add and delete', () => {
   assert(!source.includes("row.appId?null:e('button'"), 'no row-level add-bot button remains');
 });
 
+test('an account-scoped form stays writable', () => {
+  // The settings form disables every control when writable is false; the account
+  // scope published snapshots without that flag, so the page became read-only.
+  assert(source.includes('writableNow()'), 'the account scope derives writable from the page scope');
+  assert(source.includes('publishResult(result)'), 'every publish goes through the helper');
+  assert(!source.includes("publish({...result,status:'ready'})"), 'no publish drops the flag');
+});
+
 test('the panel loads its own snapshot', () => {
   // It used to rely on the settings form to trigger the first load; that form is
   // hidden when no bot is selected, so deleting the last bot left the page on

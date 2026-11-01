@@ -56,6 +56,10 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     const listeners=new Set();
     let state={status:'loading',writable:true};
     const publish=next=>{state=next;for(const fn of listeners)fn();};
+    // The form disables its fields when writable is false, so every publish must
+    // carry it: an account scope that dropped the flag made the whole page read-only.
+    const writableNow=()=>base.getSnapshot().writable!==false;
+    const publishResult=result=>publish({...result,status:'ready',writable:writableNow()});
     const SCOPED=new Set(['getConfig','setConfig','runAction','botCard','registrationBegin','registrationPoll','registrationApply']);
     const call=(method,args)=>{
       const payload=SCOPED.has(method)?{accountId,...(args??{})}:args;
@@ -64,9 +68,9 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     return {
       getSnapshot:()=>state,
       subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn);},
-      async reload(){const result=await call('getConfig',{});publish({...result,status:'ready'});return result;},
-      async update(value,revision){const result=await call('setConfig',{value,revision:revision??state.revision});publish({...result,status:'ready'});return result;},
-      async runAction(){const result=await call('runAction',{});publish({...result,status:'ready'});return result;},
+      async reload(){const result=await call('getConfig',{});publishResult(result);return result;},
+      async update(value,revision){const result=await call('setConfig',{value,revision:revision??state.revision});publishResult(result);return result;},
+      async runAction(){const result=await call('runAction',{});publishResult(result);return result;},
       call,
       close(){listeners.clear();},
     };
