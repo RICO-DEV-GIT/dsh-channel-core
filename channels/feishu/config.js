@@ -32,8 +32,8 @@ function streaming(value){
 const base=defineConfig({
   enabled:false,accountId:'default',appId:'',domain:'feishu',appSecretRef:'FEISHU_APP_SECRET',allowedUsers:[],allowGroups:false,autoCollectGroups:false,allowedGroups:[],requireMention:true,
   inputMode:'inherit',agentPreset:'',rolePreset:'',workspacePath:'',memoryNamespace:'private',identityLinks:[],ownerMode:'first-dm',ownerUserId:'',
-  streaming:streaming({mode:'progress'}),throttleMs:750,attachments:true,maxAttachmentMB:10
-},{accountId:id,appSecretRef:ref,inputMode:v=>['inherit','steering','queue','interrupt'].includes(v),domain:v=>['feishu','lark'].includes(v),workspacePath:v=>v===''||path.isAbsolute(v),memoryNamespace:id,ownerMode:v=>['first-dm','manual'].includes(v),ownerUserId:(v,c)=>v===''?c.ownerMode==='first-dm':id(v),agentPreset:v=>v===''||id(v),rolePreset:v=>v===''||id(v),allowedUsers:v=>v.length<=1000&&v.every(id),allowedGroups:v=>v.length<=1000&&v.every(id),autoCollectGroups:v=>typeof v==='boolean',identityLinks:v=>v.length<=1000&&v.every(s=>s.includes('=')&&s.split('=').length===2&&s.split('=').every(id)),throttleMs:v=>Number.isSafeInteger(v)&&v>=400&&v<=5000,maxAttachmentMB:v=>Number.isSafeInteger(v)&&v>=1&&v<=20});
+  streaming:streaming({mode:'progress'}),throttleMs:750,attachments:true,maxAttachmentMB:10,modelCardStyle:'checker',modelPageSize:6
+},{accountId:id,appSecretRef:ref,inputMode:v=>['inherit','steering','queue','interrupt'].includes(v),domain:v=>['feishu','lark'].includes(v),workspacePath:v=>v===''||path.isAbsolute(v),memoryNamespace:id,ownerMode:v=>['first-dm','manual'].includes(v),ownerUserId:(v,c)=>v===''?c.ownerMode==='first-dm':id(v),agentPreset:v=>v===''||id(v),rolePreset:v=>v===''||id(v),allowedUsers:v=>v.length<=1000&&v.every(id),allowedGroups:v=>v.length<=1000&&v.every(id),autoCollectGroups:v=>typeof v==='boolean',identityLinks:v=>v.length<=1000&&v.every(s=>s.includes('=')&&s.split('=').length===2&&s.split('=').every(id)),throttleMs:v=>Number.isSafeInteger(v)&&v>=400&&v<=5000,maxAttachmentMB:v=>Number.isSafeInteger(v)&&v>=1&&v<=20,modelCardStyle:v=>['checker','dropdown'].includes(v),modelPageSize:v=>Number.isSafeInteger(v)&&v>=4&&v<=10});
 /**
  * Multi-account (v2) shape: `{ schemaVersion: 2, defaultAccount, accounts, shared }`.
  *
@@ -59,6 +59,8 @@ const ACCOUNT_FIELDS=Object.freeze({
   autoCollectGroups:false,allowedGroups:[],requireMention:true,inputMode:'inherit',agentPreset:'',rolePreset:'',
   workspacePath:'',memoryNamespace:'private',identityLinks:[],ownerMode:'first-dm',ownerUserId:'',
   attachments:true,maxAttachmentMB:10,
+  // Which /model card layout this bot uses, and how many model rows it shows per page.
+  modelCardStyle:'checker',modelPageSize:6,
 });
 /**
  * Display options belong to the bot, not to the plugin: two bots can legitimately

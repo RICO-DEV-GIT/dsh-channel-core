@@ -381,8 +381,14 @@ export async function createTransport({config,credentials,signal,receive,state,d
     const tapForm=event.raw?.action?.form_value??event.action?.form_value;
     const tapFields=tapForm&&typeof tapForm==='object'?Object.keys(tapForm).join(','):'（无）';
     const tapModel=tapForm&&typeof tapForm==='object'?String(tapForm.dsh_model??'（空）'):'（空）';
-    // Model picker taps are host-side state changes, not Ask User answers.
-    const modelIntent=readModelPickerAction({token,values:tapForm??undefined});
+    // Model picker taps are host-side state changes, not Ask User answers. A checker row
+    // carries its model on the component value, and reports its ticked state separately.
+    const modelIntent=readModelPickerAction({
+      token,
+      values:tapForm??undefined,
+      value:event?.action?.value,
+      checked:event?.action?.checked,
+    });
     if(modelIntent){
       const record=modelCards.get(event.messageId);
       if(!record){

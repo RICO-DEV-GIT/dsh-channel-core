@@ -24,6 +24,11 @@ const CARDS = {
     ] },
     page: 1,
   },
+  // The checker layout has its own component set (checker rows + a form holding a
+  // column_set of pager buttons), so it needs its own compliance fixtures.
+  'checker: first page': { catalog: { groups: [{ id: 'p', models: Array.from({ length: 30 }, (_, i) => ({ id: 'm-' + i })) }] }, page: 0, mode: 'checker' },
+  'checker: middle page with a tick': { catalog: { groups: [{ id: 'p', models: Array.from({ length: 30 }, (_, i) => ({ id: 'm-' + i })) }] }, page: 1, mode: 'checker', picked: 'p/m-2' },
+  'checker: tiny catalog, page size 4': { catalog: { groups: [{ id: 'p', models: [{ id: 'a' }] }] }, page: 0, mode: 'checker', pageSize: 4 },
 };
 
 // Documented enums.
@@ -47,6 +52,8 @@ const ALLOWED_KEYS = {
   column: ['tag', 'element_id', 'background_style', 'width', 'weight', 'horizontal_spacing', 'horizontal_align', 'vertical_align', 'vertical_spacing', 'direction', 'padding', 'margin', 'elements'],
   button: ['tag', 'element_id', 'margin', 'type', 'size', 'width', 'text', 'icon', 'hover_tips', 'disabled', 'disabled_tips', 'confirm', 'behaviors', 'name', 'form_action_type'],
   select_static: ['tag', 'element_id', 'margin', 'type', 'name', 'required', 'disabled', 'initial_option', 'initial_index', 'placeholder', 'width', 'behaviors', 'options', 'confirm'],
+  // 勾选器：文档字段见 checker.md（name 仅表单内必填；behaviors 仅支持 callback）。
+  checker: ['tag', 'element_id', 'name', 'checked', 'text', 'overall_checkable', 'button_area', 'checked_style', 'margin', 'padding', 'confirm', 'behaviors'],
 };
 
 const isPx = (value, min, max) => /^\d+px$/.test(String(value)) && Number.parseInt(value, 10) >= min && Number.parseInt(value, 10) <= max;
@@ -108,6 +115,20 @@ function checkCard(card, where) {
 
       if (node.tag === 'markdown') {
         if (typeof node.content !== 'string' || !node.content) fail(at + ' markdown content empty');
+      } else if (node.tag === 'checker') {
+        if (!node.text || !['plain_text', 'lark_md'].includes(node.text.tag)) fail(at + ' checker.text must be plain_text/lark_md');
+        if (typeof node.text?.content !== 'string' || !node.text.content) fail(at + ' checker.text.content empty');
+        if (node.checked !== undefined && typeof node.checked !== 'boolean') fail(at + ' checker.checked must be boolean');
+        if (node.overall_checkable !== undefined && typeof node.overall_checkable !== 'boolean') fail(at + ' overall_checkable must be boolean');
+        // 勾选器只支持 callback 交互；未配置 behaviors 时点击仅本地有效。
+        if (!Array.isArray(node.behaviors) || !node.behaviors.length) fail(at + ' checker without behaviors');
+        for (const behavior of node.behaviors ?? []) {
+          if (behavior?.type !== 'callback') fail(at + ' checker only supports callback behaviors');
+          if (typeof behavior.value !== 'object' || behavior.value === null) fail(at + ' checker callback value must be an object');
+        }
+        if (node.confirm !== undefined) {
+          if (!node.confirm?.title?.content || !node.confirm?.text?.content) fail(at + ' checker.confirm needs title and text');
+        }
       } else if (node.tag === 'button') {
         if (!node.text || node.text.tag !== 'plain_text') fail(at + ' button.text must be plain_text');
         if (String(node.text?.content ?? '').length > 100) fail(at + ' button text over 100 chars');
@@ -198,7 +219,14 @@ function checkCard(card, where) {
 
 for (const [name, fixture] of Object.entries(CARDS)) {
   test('card is compliant with the platform schema: ' + name, () => {
-    const card = buildModelPickerCard({ catalog: fixture.catalog, page: fixture.page, selected: { provider: 'p', model: 'a' } });
+    const card = buildModelPickerCard({
+      catalog: fixture.catalog,
+      page: fixture.page,
+      selected: { provider: 'p', model: 'a' },
+      mode: fixture.mode,
+      picked: fixture.picked,
+      pageSize: fixture.pageSize,
+    });
     assert.ok(card, name + ': card was not built');
     const problems = checkCard(card, name);
     assert.deepEqual(problems, [], problems.join('\n'));

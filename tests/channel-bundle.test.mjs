@@ -82,7 +82,7 @@ test('Discord and Feishu align functional groups and keep infrequent settings in
   // Feishu drops appId and the credential field from the form: the bot panel owns
   // both, so a second rendered copy would let the two disagree. The workspace IS
   // editable (changing it migrates the files); the credential name is not.
-  assert.equal(fields.length,provider==='discord'?41:38,'all config fields remain available');  if(provider==='feishu'){
+  assert.equal(fields.length,provider==='discord'?41:40,'all config fields remain available');  if(provider==='feishu'){
     assert(!byKey.has('appId'),'the Feishu form must not render a second App ID input');
     assert(byKey.get('workspacePath')?.type==='text','the workspace can be changed');
     assert(byKey.get('appSecretRef')?.type==='readonly','the credential name is assigned, not typed');
