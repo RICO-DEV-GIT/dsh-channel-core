@@ -381,14 +381,6 @@ export async function createTransport({config,credentials,signal,receive,state,d
     const tapForm=event.raw?.action?.form_value??event.action?.form_value;
     const tapFields=tapForm&&typeof tapForm==='object'?Object.keys(tapForm).join(','):'（无）';
     const tapModel=tapForm&&typeof tapForm==='object'?String(tapForm.dsh_model??'（空）'):'（空）';
-    // Diagnostic probe: report exactly what the platform delivered for this tap, so a
-    // dead button can be diagnosed (no callback / no token / token but no card) instead
-    // of guessed. Temporary; removed once the paging path is confirmed.
-    if(token==='dsh:model:probe'){
-      const known=modelCards.has(event.messageId)?'是':'否';
-      recordModelCardTap({token,formKeys:tapFields,modelValue:tapModel,registered:known,outcome:'探针'});
-      return {toast:{type:'info',content:'探针：回调已到达｜token='+token+'｜表单字段='+tapFields+'｜模型值='+tapModel+'｜卡片已登记='+known}};
-    }
     // Model picker taps are host-side state changes, not Ask User answers.
     const modelIntent=readModelPickerAction({token,values:tapForm??undefined});
     if(modelIntent){
