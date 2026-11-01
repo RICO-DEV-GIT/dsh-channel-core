@@ -628,6 +628,36 @@
         "advanced": false
       },
       {
+        "key": "modelCardStyle",
+        "group": "会话与输入",
+        "label": "模型卡片样式",
+        "type": "select",
+        "options": [
+          [
+            "all",
+            "全量下拉（可搜索）"
+          ],
+          [
+            "checker",
+            "勾选器（分页）"
+          ],
+          [
+            "dropdown",
+            "分页下拉"
+          ]
+        ],
+        "advanced": false
+      },
+      {
+        "key": "modelPageSize",
+        "group": "会话与输入",
+        "label": "每页模型数",
+        "type": "number",
+        "min": 4,
+        "max": 10,
+        "advanced": false
+      },
+      {
         "key": "agentPreset",
         "group": "会话与输入",
         "label": "Agent 预设 ID",
