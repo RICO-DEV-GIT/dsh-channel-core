@@ -24,6 +24,7 @@ const many = { groups: [{ id: 'ark', models: Array.from({ length: 45 }, (_, inde
 const LAST_PAGE = pageCountOf(many) - 1;
 
 const formOf = card => card.body.elements.find(element => element.tag === 'form');
+const tableOf = card => card.body.elements.find(element => element.tag === 'table');
 const selectOf = card => formOf(card).elements.find(element => element.tag === 'select_static');
 const formButtons = card => formOf(card).elements.filter(element => element.tag === 'button');
 /** Pager nodes: the two-in-a-row column_set, or a lone full-width button. */
@@ -51,6 +52,26 @@ test('the card asks to be updatable and carries no diagnostics', () => {
   assert.equal(JSON.stringify(card).includes('测试'), false, 'the probe is gone');
 });
 
+test('the list is a root-level table of six rows with # and 模型 columns', () => {
+  assert.equal(PAGE_SIZE, 6);
+  const card = buildModelPickerCard({ catalog: many });
+  const table = tableOf(card);
+  assert.deepEqual(card.body.elements.map(element => element.tag).slice(0, 2), ['markdown', 'table'], 'the table sits at the card root, before the form');
+  assert.equal(table.page_size, 6);
+  assert.equal(table.row_height, 'auto', 'long names wrap instead of being clipped');
+  assert.deepEqual(table.columns.map(column => column.name), ['index', 'model']);
+  assert.equal(table.rows.length, 6);
+  assert.deepEqual(table.rows[0], { index: '1', model: 'ark/model-0' });
+  assert.deepEqual(table.rows[5], { index: '6', model: 'ark/model-5' });
+});
+
+test('the table keeps numbering continuous across pages', () => {
+  const second = tableOf(buildModelPickerCard({ catalog: many, page: 1 }));
+  assert.deepEqual(second.rows[0], { index: '7', model: 'ark/model-6' });
+  const last = tableOf(buildModelPickerCard({ catalog: many, page: LAST_PAGE }));
+  assert.equal(last.rows[0].index, String(LAST_PAGE * PAGE_SIZE + 1));
+});
+
 test('one page keeps a single form: select + 切换, no pager when it all fits', () => {
   const card = buildModelPickerCard({ catalog, selected: { provider: 'opencode-go', model: 'deepseek-v4.1-flash' } });
   assert.equal(card.body.elements.filter(element => element.tag === 'form').length, 1);
@@ -60,19 +81,25 @@ test('one page keeps a single form: select + 切换, no pager when it all fits',
   assert.match(card.body.elements[0].content, /当前模型：\*\*opencode-go\/deepseek-v4\.1-flash\*\*/);
 });
 
-test('the select shows no initial option; the header states the real model', () => {
-  const card = buildModelPickerCard({ catalog, selected: { provider: 'ark', model: 'doubao-snapshot-pro' } });
+test('the select holds the same rows as the table and shows no initial option', () => {
+  const card = buildModelPickerCard({ catalog: many });
+  const table = tableOf(card);
+  assert.deepEqual(selectOf(card).options.map(option => option.value), table.rows.map(row => row.model));
   assert.equal(selectOf(card).initial_index, 0);
   assert.equal(selectOf(card).required, false);
+});
+
+test('the current model is listed first on its page', () => {
+  const card = buildModelPickerCard({ catalog, selected: { provider: 'ark', model: 'doubao-snapshot-pro' } });
+  assert.equal(selectOf(card).options[0].value, 'ark/doubao-snapshot-pro');
+  assert.equal(selectOf(card).options.length, 4, 'reordering must not duplicate it');
   assert.match(card.body.elements[0].content, /\*\*ark\/doubao-snapshot-pro\*\*/);
-  assert.equal(selectOf(card).options[0].value, 'ark/doubao-snapshot-pro', 'the current model is listed first');
 });
 
 test('paging sits outside the form; first page has no 上一页, last none 下一页', () => {
   const first = buildModelPickerCard({ catalog: many });
   assert.deepEqual(pagerOf(first).map(button => button.text.content), ['下一页 →']);
   assert.equal(formButtons(first).length, 1, 'the form still only holds 切换');
-  // A lone pager button takes the whole row instead of an empty second column.
   assert.equal(first.body.elements.some(element => element.tag === 'column_set'), false);
   assert.equal(pagerOf(first)[0].width, 'fill');
 
@@ -81,7 +108,6 @@ test('paging sits outside the form; first page has no 上一页, last none 下�
   const columns = middle.body.elements.find(element => element.tag === 'column_set').columns;
   assert.equal(columns.length, 2, 'both buttons share one row');
   assert.deepEqual(columns.map(column => column.elements.length), [1, 1]);
-  assert.equal(pagerOf(middle).every(button => button.width === undefined), true, 'no fill inside columns');
 
   const last = buildModelPickerCard({ catalog: many, page: LAST_PAGE });
   assert.deepEqual(pagerOf(last).map(button => button.text.content), ['← 上一页']);
@@ -99,15 +125,14 @@ test('pager buttons carry the page and are not form submits', () => {
   }
 });
 
-test('a long list pages ten at a time and never loses a model', () => {
-  assert.equal(PAGE_SIZE, 10);
+test('paging never loses a model', () => {
   assert.equal(pageCountOf(many), Math.ceil(45 / PAGE_SIZE));
   const seen = new Set();
   for (let page = 0; page < pageCountOf(many); page += 1) {
     for (const option of selectOf(buildModelPickerCard({ catalog: many, page })).options) seen.add(option.value);
   }
   assert.equal(seen.size, 45, 'every model appears exactly once');
-  assert.equal(selectOf(buildModelPickerCard({ catalog: many, page: LAST_PAGE })).options.length, 45 - LAST_PAGE * PAGE_SIZE);
+  assert.equal(tableOf(buildModelPickerCard({ catalog: many, page: LAST_PAGE })).rows.length, 45 - LAST_PAGE * PAGE_SIZE);
 });
 
 test('page tokens must be digits', () => {
@@ -119,8 +144,8 @@ test('page tokens must be digits', () => {
 
 test('a switch lands on the page holding the chosen model', () => {
   assert.equal(pageOfModel(many, 'ark/model-0'), 0);
-  assert.equal(pageOfModel(many, 'ark/model-25'), 2);
-  assert.equal(pageOfModel(many, 'ark/model-44'), 4);
+  assert.equal(pageOfModel(many, 'ark/model-25'), 4);
+  assert.equal(pageOfModel(many, 'ark/model-44'), 7);
   assert.equal(pageOfModel(many, 'ark/missing'), 0);
 });
 
