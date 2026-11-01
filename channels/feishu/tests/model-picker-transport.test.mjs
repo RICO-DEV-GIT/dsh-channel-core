@@ -23,9 +23,9 @@ function fixture(host) {
   return { calls, listeners, channel, create };
 }
 
-const tapModel = async (listeners, values, token = 'dsh:model:apply', messageId = 'card-1') => {
+const tapModel = async (listeners, values, token = 'dsh:model:apply', messageId = 'card-1', formValues = values) => {
   const handler = listeners.get('cardAction');
-  return handler({ messageId, chatId: origin.conversationId, operator: { openId: origin.userId }, action: { value: { dsh: token } }, raw: { action: { form_value: values } } });
+  return handler({ messageId, chatId: origin.conversationId, operator: { openId: origin.userId }, action: { value: { dsh: token } }, raw: { action: { form_value: formValues } } });
 };
 
 test('a picker card is sent as an interactive card and remembered for taps', async () => {
@@ -50,13 +50,38 @@ test('a tap re-renders the card for the Session the card belongs to', async () =
   const t = await f.create();
   try {
     await t.send(origin, { feishuModelCard: { card, sessionId: 'session-a' }, text: 'x', status: 'completed', final: true });
-    const reply = await tapModel(f.listeners, { dsh_provider: 'ark', dsh_model: 'ark/model-x' });
+    await tapModel(f.listeners, { dsh_provider: 'ark', dsh_model: 'ark/model-x' });
     assert.deepEqual(seen, [{ sessionId: 'session-a', action: { kind: 'apply', provider: 'ark', model: 'ark/model-x' } }]);
-    assert.equal(reply.toast.content, '已切换模型');
-    // The new card travels in the callback response — the documented way to update a card
-    // from an interaction. Calling the update API afterwards never changed anything.
-    assert.deepEqual(reply.card, { type: 'raw', data: card });
-    assert.equal(f.calls.filter(call => call.type === 'update').length, 0, 'no separate update call');
+    // The SDK discards a card-action handler's return value, so the card must be updated
+    // through the API; returning it in the response never reached Feishu.
+    const update = f.calls.find(call => call.type === 'update');
+    assert.ok(update, 'the card is updated through the API');
+    assert.equal(update.id, 'card-1');
+    assert.deepEqual(update.payload, card);
+  } finally { await t.close(); }
+});
+
+test('a page tap also updates the card through the API', async () => {
+  const f = fixture({ modelPicker: async () => ({ card }) });
+  const t = await f.create();
+  try {
+    await t.send(origin, { feishuModelCard: { card, sessionId: 'session-a' }, text: 'x', status: 'completed', final: true });
+    await tapModel(f.listeners, {}, 'dsh:model:apply', 'card-1', { dsh_model: '__dsh_page:2' });
+    const update = f.calls.find(call => call.type === 'update');
+    assert.ok(update, 'paging patches the card');
+    assert.equal(update.id, 'card-1');
+  } finally { await t.close(); }
+});
+
+test('a failed patch reports through a message, not a toast', async () => {
+  const f = fixture({ modelPicker: async () => ({ card }) });
+  const t = await f.create();
+  f.channel.updateCard = async () => { throw Object.assign(new Error('rejected'), { code: 230099 }); };
+  try {
+    await t.send(origin, { feishuModelCard: { card, sessionId: 'session-a' }, text: 'x', status: 'completed', final: true });
+    await tapModel(f.listeners, { dsh_model: 'ark/model-x' }, 'dsh:model:apply', 'card-1');
+    const texts = f.calls.filter(call => call.type === 'send' && call.body?.text).map(call => call.body.text);
+    assert.ok(texts.some(text => text.includes('230099')), 'the failure code reaches the operator: ' + JSON.stringify(texts));
   } finally { await t.close(); }
 });
 

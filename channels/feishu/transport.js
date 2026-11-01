@@ -391,17 +391,25 @@ export async function createTransport({config,credentials,signal,receive,state,d
       }
       try{
         const result=await host?.modelPicker?.({sessionId:record.sessionId,action:modelIntent});
-        // The documented way to update a card from an interaction is to return the new
-        // card in the callback response (handle-card-callbacks, 方式一), not to call the
-        // update API afterwards: that one needs the callback's own token and is limited
-        // to two updates. Returning it here is what makes a tap actually change the card.
-        const response=result?.toast?{toast:result.toast}:{};
-        if(result?.card)response.card={type:'raw',data:result.card};
-        recordModelCardTap({
-          token,formKeys:tapFields,modelValue:tapModel,registered:'是',
-          outcome:result?.card?'回调返回新卡片':'仅 toast',
-        });
-        return response;
+        // This SDK never sends a card-action response back (pushAction discards the handler's
+        // return value), so a tap can only change the card through the API. patchCard /
+        // updateCard is the single supported path here.
+        let outcome='无卡片变更';
+        if(result?.card){
+          try{
+            await channel.updateCard(event.messageId,result.card);
+            outcome='patch 成功';
+          }catch(error){
+            const code=error?.code??error?.status??error?.message??'未知';
+            outcome='patch 失败('+code+')';
+            // No toast channel either: report with a real message so the operator sees it.
+            try{
+              await channel.send(event.chatId,{text:'卡片更新失败（'+code+'），请重新发送 /model。'},sendOptions({messageId:event.messageId,threadId:event.threadId}));
+            }catch{/* nothing else to do */ }
+          }
+        }
+        recordModelCardTap({token,formKeys:tapFields,modelValue:tapModel,registered:'是',outcome});
+        return {};
       }catch(error){
         recordModelCardTap({token,formKeys:tapFields,modelValue:tapModel,registered:'是',outcome:'宿主失败:'+(error?.message??'未知')});
         return {toast:{type:'error',content:'切换失败：'+(error?.message??'未知原因')}};
