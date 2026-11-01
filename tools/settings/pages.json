@@ -203,7 +203,7 @@
         "group": "会话与输入",
         "label": "工作区路径",
         "type": "text",
-        "help": "自动分配：每个机器人一个独立目录（由 App ID 决定），一般不需要修改。",
+        "help": "未选择角色时生效。留空跟随客户端默认工作区；填写后新会话使用该目录。",
         "advanced": false,
         "when": {
           "rolePreset": ""
@@ -638,24 +638,12 @@
         "fold": "更多会话设置"
       },
       {
-        "key": "workspacePath",
-        "group": "会话与输入",
-        "label": "工作区路径",
-        "type": "text",
-        "help": "未选择角色时生效。留空使用官方默认工作区；填写后按工作区隔离会话。",
-        "when": {
-          "rolePreset": ""
-        },
-        "advanced": false,
-        "fold": "更多会话设置"
-      },
-      {
         "key": "resolvedWorkspace",
         "label": "实际工作区",
         "type": "readonly",
         "detail": "workspacePath",
         "placeholder": "渠道连接后显示",
-        "help": "显示渠道新会话实际使用的目录。",
+        "help": "工作区按机器人的 App ID 自动分配，不需要填写；这里显示实际使用的目录。",
         "group": "会话与输入",
         "advanced": false,
         "fold": "更多会话设置"

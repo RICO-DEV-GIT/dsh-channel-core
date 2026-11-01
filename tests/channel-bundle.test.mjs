@@ -80,10 +80,13 @@ test('Discord and Feishu align functional groups and keep infrequent settings in
  for(const provider of ['discord','feishu']){
   const fields=pages[provider].fields,byKey=new Map(fields.map(field=>[field.key,field]));
   // Feishu drops appId + the credential field from the form: the bot panel owns
-  // both, so a second rendered copy would let the two disagree.
-  assert.equal(fields.length,provider==='discord'?41:39,'all config fields remain available');
-  if(provider==='feishu'){
+  // both, so a second rendered copy would let the two disagree. The editable
+  // workspacePath is dropped too: it is derived from the App ID, and the read-only
+  // 实际工作区 field is what the operator sees.
+  assert.equal(fields.length,provider==='discord'?41:38,'all config fields remain available');  if(provider==='feishu'){
     assert(!byKey.has('appId'),'the Feishu form must not render a second App ID input');
+    assert(!byKey.has('workspacePath'),'the workspace is assigned, not typed');
+    assert(byKey.get('resolvedWorkspace')?.type==='readonly','the resolved workspace is shown read-only');
     assert(!byKey.has('credentialSecret'),'the Feishu form must not render a second secret input');
     assert.equal(pages[provider].credentialFields,undefined,'no separate credential block either');
   }
