@@ -48,7 +48,8 @@ test('every model is reachable across pages', () => {
 
 test('the card asks to be updatable and carries no diagnostics', () => {
   const card = buildModelPickerCard({ catalog: many });
-  assert.deepEqual(card.config, { wide_screen_mode: true, update_multi: true });
+  // Only documented 2.0 config keys: wide_screen_mode belongs to JSON 1.0.
+  assert.deepEqual(card.config, { update_multi: true });
   assert.equal(JSON.stringify(card).includes('测试'), false, 'the probe is gone');
 });
 
