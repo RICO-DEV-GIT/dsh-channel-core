@@ -238,7 +238,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
       setAddMode('manual');
       setManualAppId('');
       setManualSecret('');
-      setAddScan({status:'manual',qr:null,message:'填写飞书应用的 App ID 与 App Secret；工作区会自动创建为 G:\\DSWork\\<AppID>'});
+      setAddScan({status:'manual',qr:null,message:'填写飞书应用的 App ID 与 App Secret；工作区会自动创建，不需要你选目录'});
     };
     const applyManual=async()=>{
       const appIdText=manualAppId.trim();
@@ -287,7 +287,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
             e('button',{type:'button',className:'dcb-bot-btn',disabled:accountBusy==='add',onClick:()=>{void startQuick();}},'快捷配置'),
             e('button',{type:'button',className:'dcb-bot-copy',disabled:accountBusy==='add',onClick:()=>{void startManual();}},'手动配置'))),
         e('p',{className:'dcb-bot-link'},accounts.length
-          ?'每个机器人使用独立工作区（G:\\DSWork\\<AppID>）、独立会话；同一个机器人只能添加一次。'
+          ?'每个机器人使用独立工作区、独立会话；同一个机器人只能添加一次。'
           :'还没有机器人：点「快捷配置」扫码添加，或「手动配置」填入 App ID 与 App Secret。'),
         addScan?e('div',{className:'dcb-reg-body'},
           e('div',{className:'dcb-bot-meta'},

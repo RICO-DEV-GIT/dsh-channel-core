@@ -203,7 +203,7 @@
         "group": "会话与输入",
         "label": "工作区路径",
         "type": "text",
-        "help": "自动分配为 G:\\DSWork\\<AppID>（G:\\DSWork 不存在时为插件目录\\DSWork\\<AppID>），一般不需要修改。",
+        "help": "自动分配：每个机器人一个独立目录（由 App ID 决定），一般不需要修改。",
         "advanced": false,
         "when": {
           "rolePreset": ""
