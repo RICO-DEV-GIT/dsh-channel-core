@@ -11,7 +11,7 @@ import { verifyQueuedFile } from '../../lib/outbound-file.js';
 import { buildBotCard } from '../../lib/bot-card.js';
 import { channelHint } from '../../lib/channel-hints.js';
 import { readModelPickerAction } from '../../lib/model-picker-card.js';
-import { recordModelCardTap } from '../../lib/model-card-diagnostics.js';
+import { recordModelCardTap, recordConnection } from '../../lib/model-card-diagnostics.js';
 
 const imageExtension=head=>{
   if(head.length>=12&&head.toString('latin1',0,4)==='RIFF'&&head.toString('latin1',8,12)==='WEBP')return 'webp';
@@ -585,13 +585,15 @@ export async function createTransport({config,credentials,signal,receive,state,d
     return {frozen:!!frozen,closed};
   }
   const present=async(origin,body,actions=[],options)=>presentPayload(origin,card(await presentation(body),actions,options),{streaming:(options?.mode==='progress'||options?.mode==='partial')&&!actions.length&&body.final!==true,final:body.final===true});
-  let closing;const close=()=>closing??=(async()=>{signal.removeEventListener('abort',onAbort);disposers.splice(0).forEach(dispose=>dispose());await channel.disconnect();progress.clear();presented.clear();kitRecords.clear();questionCards.clear();questionContexts.clear();})();
+  let closing;const close=()=>closing??=(async()=>{signal.removeEventListener('abort',onAbort);disposers.splice(0).forEach(dispose=>dispose());recordConnection('离线');await channel.disconnect();progress.clear();presented.clear();kitRecords.clear();questionCards.clear();questionContexts.clear();})();
   const onAbort=()=>{void close().catch(()=>{});};signal.addEventListener('abort',onAbort,{once:true});
   return {
     throttleMs:config.throttleMs,
     showNarration:config.streaming.mode==='progress'&&config.streaming.progress.narration,
     showPublicDrafts:config.streaming.mode==='progress'&&config.streaming.progress.draft,
-    start:()=>channel.connect(),
+    // Feishu answers "目标回调服务当前未在线" whenever the long connection is down, so the
+    // state is recorded here and shown by /model probe instead of being guessed at.
+    start:async()=>{recordConnection('连接中…');try{await channel.connect();recordConnection('在线');}catch(error){recordConnection('连接失败：'+(error?.message??'未知'));throw error;}},
     details:()=>({feishuCardEngine:kitRecords.size?'CardKit':kitDisabled?'兼容模式（CardKit 不可用）':config.streaming.cardEngine==='patch'?'兼容模式':'CardKit 待首次流式创建'}),
     /**
      * Scannable bot card. The Channel SDK keeps the bot identity internally:
