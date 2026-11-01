@@ -542,18 +542,20 @@
       {
         "key": "appSecretRef",
         "label": "凭证名称",
-        "type": "text",
-        "help": "密钥在下方凭证区单独保存，config.json 只保存引用名称。",
+        "type": "readonly",
+        "help": "由账号自动分配，不需要修改。",
         "group": "账号与连接",
         "advanced": false,
-        "fold": "更多连接设置"
+        "fold": "更多连接设置",
+        "detail": "credentialRef",
+        "placeholder": "自动分配"
       },
       {
         "key": "allowedUsers",
         "group": "接收与权限",
         "label": "允许使用的用户 ID",
         "type": "list",
-        "help": "每行一个；留空时仍可连接，但不接收会话消息。",
+        "help": "每行一个 open_id。留空且主人模式为 first-dm 时，任何人的私聊都会响应并由第一位认领；填写后只有列表内用户与主人可私聊。",
         "advanced": false
       },
       {
@@ -638,12 +640,10 @@
         "fold": "更多会话设置"
       },
       {
-        "key": "resolvedWorkspace",
-        "label": "实际工作区",
-        "type": "readonly",
-        "detail": "workspacePath",
-        "placeholder": "渠道连接后显示",
-        "help": "工作区按机器人的 App ID 自动分配，不需要填写；这里显示实际使用的目录。",
+        "key": "workspacePath",
+        "label": "修改工作区目录",
+        "type": "text",
+        "help": "修改后会把这个机器人的旧目录内容迁移到新目录。",
         "group": "会话与输入",
         "advanced": false,
         "fold": "更多会话设置"

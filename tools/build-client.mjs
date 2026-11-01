@@ -190,7 +190,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
           const fresh=await scope.call('getConfig',{});
           setAccounts(fresh?.accounts??null);
           setAddScan(null);
-          setNotice('已添加机器人 '+(result.appId||'')+'，工作区 '+(created.workspacePath||''));
+          setNotice('已添加：'+(result.appId||''));
           await scope.reload();
         }catch(error){
           // Never leave a row behind that cannot work: undo the account we created.
@@ -260,7 +260,7 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
         await scope.call('registrationApply',{appId:appIdText,openId:'',domain:'',accountId:created.accountId});
         await refreshAccounts();
         setAddScan(null);
-        setNotice('已添加机器人 '+appIdText+'，工作区 '+(created.workspacePath||''));
+        setNotice('已添加：'+appIdText);
         await scope.reload();
       }catch(error){
         if(created?.accountId){try{await scope.call('accountRemove',{accountId:created.accountId});}catch{}await refreshAccounts();}
@@ -271,13 +271,11 @@ const clientComponent=`const bundledChannelPanels=${JSON.stringify(adapt)};
     const removeAccount=async accountId=>{
       setAccountBusy(accountId);
       try{
-        const result=await scope.call('accountRemove',{accountId});
-        setAccounts(result?.accounts??null);
+        await scope.call('accountRemove',{accountId});
+        await refreshAccounts();
         setConfirmDelete('');
-        const credential=result?.credentialRef?'，凭证 '+result.credentialRef+' 已可清理':'';
-        setNotice('已删除机器人 '+accountId+credential);
         await scope.reload();
-      }catch(error){setNotice('删除机器人失败：'+error.message);}
+      }catch(error){setNotice('删除失败：'+error.message);}
       finally{setAccountBusy('');}
     };
     const accountsBlock=()=>{

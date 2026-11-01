@@ -24,7 +24,7 @@ test('there is only add and delete: no replace, no switch, no persistent QR', ()
   // The incident came from one control meaning two things. Adding always creates a
   // new row; changing a bot is delete + add, so an existing bot can never be
   // swapped out silently.
-  assert(source.includes('添加机器人'), 'adding a bot is the only create action');
+  assert(source.includes('快捷配置') && source.includes('手动配置'), 'the two add entry points are the buttons');
   assert(!source.includes('扫码添加 / 切换机器人'), 'the ambiguous switch/scan control is gone');
   assert(!source.includes('更换机器人'), 'there is no replace path at all');
   assert(!source.includes('scanBlock()'), 'no persistent scan block is rendered');
