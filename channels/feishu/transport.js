@@ -377,6 +377,16 @@ export async function createTransport({config,credentials,signal,receive,state,d
     const token=event?.action?.value?.dsh;
     if(signal.aborted)return {toast:{type:'error',content:'渠道正在重连，请稍后重试。'}};
     if(typeof token!=='string'||!token)return {toast:{type:'error',content:'按钮缺少有效操作信息，请重新发起提问。'}};
+    // Diagnostic probe: report exactly what the platform delivered for this tap, so a
+    // dead button can be diagnosed (no callback / no token / token but no card) instead
+    // of guessed. Temporary; removed once the paging path is confirmed.
+    if(token==='dsh:model:probe'){
+      const form=event.raw?.action?.form_value??event.action?.form_value;
+      const fields=form&&typeof form==='object'?Object.keys(form).join(','):'（无）';
+      const model=form&&typeof form==='object'?String(form.dsh_model??'（空）'):'（空）';
+      const known=modelCards.has(event.messageId)?'是':'否';
+      return {toast:{type:'info',content:'探针：回调已到达｜token='+token+'｜表单字段='+fields+'｜模型值='+model+'｜卡片已登记='+known}};
+    }
     // Model picker taps are host-side state changes, not Ask User answers.
     const modelIntent=readModelPickerAction({token,values:(event.raw?.action?.form_value??event.action?.form_value)??undefined});
     if(modelIntent){
@@ -386,7 +396,7 @@ export async function createTransport({config,credentials,signal,receive,state,d
         const result=await host?.modelPicker?.({sessionId:record.sessionId,action:modelIntent});
         if(result?.card){
           try{await channel.updateCard(event.messageId,result.card);}
-          catch{/* the card was recalled: report instead of throwing */ return {toast:{type:'error',content:'卡片已失效，请重新发送 /model。'}};}
+          catch(error){/* the card was recalled, or the update itself is refused: say which */ return {toast:{type:'error',content:'卡片更新失败（'+(error?.code??error?.message??'未知')+'），请重新发送 /model。'}};}
         }
         // `toast: null` means "nothing to say" (a debounced double tap): returning an
         // empty toast would render an empty bubble on the phone.

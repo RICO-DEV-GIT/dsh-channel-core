@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildModelPickerCard, readModelPickerAction, conversationalModels, providersOf,
-  modelOptionsOf, pageCountOf, pageOfModel, PAGE_SIZE,
+  modelOptionsOf, pageCountOf, pageOfModel, PAGE_SIZE, INCLUDE_PROBE,
 } from '../lib/model-picker-card.js';
 
 const catalog = {
@@ -24,7 +24,15 @@ const many = { groups: [{ id: 'ark', models: Array.from({ length: 45 }, (_, inde
 const formOf = card => card.body.elements.find(element => element.tag === 'form');
 const selectOf = card => formOf(card).elements.find(element => element.tag === 'select_static');
 const buttonsOf = card => formOf(card).elements.filter(element => element.tag === 'button');
-const labels = card => buttonsOf(card).map(button => button.text.content);
+// The temporary 🔍 测试 probe is not part of the paging contract.
+const realButtons = card => buttonsOf(card).filter(button => button.name !== 'dsh_probe');
+const labels = card => realButtons(card).map(button => button.text.content);
+
+test('the temporary probe button is present while diagnostics are on', () => {
+  assert.equal(INCLUDE_PROBE, true);
+  const probe = buttonsOf(buildModelPickerCard({ catalog })).find(button => button.name === 'dsh_probe');
+  assert.equal(probe?.behaviors[0].value.dsh, 'dsh:model:probe');
+});
 
 test('non-chat models are filtered out of the picker', () => {
   const ark = providersOf(catalog).find(group => group.id === 'ark');
@@ -90,7 +98,7 @@ test('a long list pages ten at a time and never loses a model', () => {
 
 test('the pager buttons carry the page in their token', () => {
   const middle = buildModelPickerCard({ catalog: many, page: 1 });
-  const tokens = buttonsOf(middle).map(button => button.behaviors[0].value.dsh);
+  const tokens = realButtons(middle).map(button => button.behaviors[0].value.dsh);
   assert.deepEqual(tokens, ['dsh:model:apply', 'dsh:model:page:0', 'dsh:model:page:2']);
   assert.deepEqual(readModelPickerAction({ token: 'dsh:model:page:2' }), { kind: 'page', page: 2, provider: '' });
 });
