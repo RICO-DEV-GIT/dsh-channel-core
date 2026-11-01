@@ -20,7 +20,7 @@ function fixture(host) {
     signal: new AbortController().signal, receive: async () => {}, state: () => {}, action: async () => ({ completed: false }),
     host,
   }, sdk);
-  return { calls, listeners, create };
+  return { calls, listeners, channel, create };
 }
 
 const tapModel = async (listeners, values, token = 'dsh:model:apply', messageId = 'card-1') => {
@@ -66,6 +66,24 @@ test('a tap on a card this transport never sent is reported instead of crashing'
     const reply = await tapModel(f.listeners, { dsh_model: 'ark/x' }, 'dsh:model:apply', 'card-unknown');
     assert.equal(reply.toast.type, 'error');
     assert.match(reply.toast.content, /重新发送 \/model/);
+  } finally { await t.close(); }
+});
+
+test('a rejected card falls back to the text answer instead of failing /model', async () => {
+  const f = fixture({});
+  const t = await f.create();
+  // Make the card send fail the way Feishu rejects an invalid card.
+  f.channel.send = async (chatId, payload) => {
+    f.calls.push({ type: 'send', chatId, body: payload });
+    if (payload.card) throw Object.assign(new Error('invalid card'), { code: 230099 });
+    return { messageId: 'text-1' };
+  };
+  try {
+    const sent = await t.send(origin, { feishuModelCard: { card, sessionId: 'session-a' }, text: '当前模型：p/alpha', status: 'completed', final: true });
+    assert.equal(sent.messageId, 'text-1', 'the text answer is delivered');
+    const texts = f.calls.filter(call => call.type === 'send').map(call => call.body.text).filter(Boolean);
+    assert.equal(texts.length, 1, 'exactly one fallback message is delivered');
+    assert.match(texts[0], /当前模型：p\/alpha/);
   } finally { await t.close(); }
 });
 

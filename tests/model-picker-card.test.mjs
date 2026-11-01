@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildModelPickerCard, readModelPickerAction, conversationalModels, providersOf, OPTIONS_PER_PAGE } from '../lib/model-picker-card.js';
+import { buildModelPickerCard, readModelPickerAction, conversationalModels, providersOf, modelOptionsOf, OPTIONS_PER_PAGE } from '../lib/model-picker-card.js';
 
 const catalog = {
   groups: [
@@ -24,39 +24,49 @@ test('non-chat models are filtered out of the picker', () => {
   assert.equal(conversationalModels([{ id: 'doubao-embedding' }]).length, 1);
 });
 
-test('the card offers a provider select and a model select for the current provider', () => {
+test('the card is one form with one select holding every conversational model', () => {
   const card = buildModelPickerCard({ catalog, selected: { provider: 'opencode-go', model: 'deepseek-v4.1-flash' } });
   const forms = card.body.elements.filter(element => element.tag === 'form');
-  assert.equal(forms.length, 2);
-  const providerSelect = forms[0].elements[0];
-  assert.equal(providerSelect.name, 'dsh_provider');
-  assert.deepEqual(providerSelect.options.map(entry => entry.value), ['opencode-go', 'ark']);
-  const modelSelect = forms[1].elements[0];
-  assert.equal(modelSelect.name, 'dsh_model');
-  assert.deepEqual(modelSelect.options.map(entry => entry.value), ['opencode-go/deepseek-v4.1-flash', 'opencode-go/deepseek-v4-pro']);
-  assert.equal(modelSelect.initial_option, 'opencode-go/deepseek-v4.1-flash');
-  assert.match(card.body.elements[0].content, /当前模型：\*\*opencode-go \/ deepseek-v4\.1-flash\*\*/);
+  assert.equal(forms.length, 1, 'a single form keeps the card simple');
+  const select = forms[0].elements[0];
+  assert.equal(select.tag, 'select_static');
+  assert.equal(select.name, 'dsh_model');
+  assert.deepEqual(select.options.map(option => option.value), [
+    'opencode-go/deepseek-v4.1-flash',
+    'opencode-go/deepseek-v4-pro',
+    'ark/deepseek-v4-flash-260425',
+    'ark/doubao-snapshot-pro',
+  ]);
+  assert.equal(select.initial_option, 'opencode-go/deepseek-v4.1-flash');
+  assert.match(card.body.elements[0].content, /当前模型：\*\*opencode-go\/deepseek-v4\.1-flash\*\*/);
+  assert.match(card.body.elements.at(-1).content, /共 4 个可对话模型/);
 });
 
-test('choosing another provider lists that provider models', () => {
-  const card = buildModelPickerCard({ catalog, selected: { provider: 'opencode-go', model: 'deepseek-v4.1-flash' }, provider: 'ark' });
-  const modelSelect = card.body.elements.find(element => element.tag === 'form' && element.name === 'dsh_model_pick').elements[0];
-  assert.deepEqual(modelSelect.options.map(entry => entry.value), ['ark/deepseek-v4-flash-260425', 'ark/doubao-snapshot-pro']);
-  assert.equal(modelSelect.initial_option, undefined, 'the previous selection is not offered by this provider');
+test('every model is listed, not just the first provider', () => {
+  const values = modelOptionsOf(catalog).map(option => option.value);
+  assert(values.includes('ark/doubao-snapshot-pro'));
+  assert(values.includes('opencode-go/deepseek-v4-pro'));
 });
 
-test('long provider lists page instead of overflowing the select', () => {
+test('long lists page instead of overflowing the select', () => {
   const many = { groups: [{ id: 'ark', models: Array.from({ length: OPTIONS_PER_PAGE * 2 + 3 }, (_, index) => ({ id: 'model-' + index })) }] };
   const first = buildModelPickerCard({ catalog: many, selected: {} });
-  const select = first.body.elements.find(element => element.tag === 'form' && element.name === 'dsh_model_pick');
-  assert.equal(select.elements[0].options.length, OPTIONS_PER_PAGE);
-  const next = select.elements.find(element => element.name === 'dsh_page_next');
-  assert.equal(next.behaviors[0].value.dsh, 'dsh:model:page:1');
+  const form = first.body.elements.find(element => element.tag === 'form');
+  assert.equal(form.elements[0].options.length, OPTIONS_PER_PAGE);
+  assert.equal(form.elements.find(element => element.name === 'dsh_page_next').behaviors[0].value.dsh, 'dsh:model:page:1');
   const third = buildModelPickerCard({ catalog: many, selected: {}, page: 2 });
-  const thirdSelect = third.body.elements.find(element => element.tag === 'form' && element.name === 'dsh_model_pick');
-  assert.equal(thirdSelect.elements[0].options.length, 3);
-  assert.equal(thirdSelect.elements.find(element => element.name === 'dsh_page_next'), undefined);
-  assert.ok(thirdSelect.elements.find(element => element.name === 'dsh_page_prev'));
+  const thirdForm = third.body.elements.find(element => element.tag === 'form');
+  assert.equal(thirdForm.elements[0].options.length, 3);
+  assert.equal(thirdForm.elements.find(element => element.name === 'dsh_page_next'), undefined);
+  assert.ok(thirdForm.elements.find(element => element.name === 'dsh_page_prev'));
+});
+
+test('the switch button posts the chosen model back as a callback', () => {
+  const card = buildModelPickerCard({ catalog, selected: {} });
+  const form = card.body.elements.find(element => element.tag === 'form');
+  const apply = form.elements.find(element => element.name === 'dsh_model_apply');
+  assert.equal(apply.form_action_type, 'submit');
+  assert.equal(apply.behaviors[0].value.dsh, 'dsh:model:apply');
 });
 
 test('an empty catalog produces no card so the caller can fall back to text', () => {
@@ -65,12 +75,11 @@ test('an empty catalog produces no card so the caller can fall back to text', ()
 });
 
 test('submissions map back to an intent', () => {
-  assert.deepEqual(readModelPickerAction({ token: 'dsh:model:provider', values: { dsh_provider: 'ark' } }), { kind: 'provider', provider: 'ark' });
   assert.deepEqual(
-    readModelPickerAction({ token: 'dsh:model:apply', values: { dsh_provider: 'ark', dsh_model: 'ark/x' } }),
-    { kind: 'apply', provider: 'ark', model: 'ark/x' },
+    readModelPickerAction({ token: 'dsh:model:apply', values: { dsh_model: 'ark/doubao-snapshot-pro' } }),
+    { kind: 'apply', model: 'ark/doubao-snapshot-pro', provider: 'ark' },
   );
-  assert.deepEqual(readModelPickerAction({ token: 'dsh:model:page:2', values: { dsh_provider: 'ark' } }), { kind: 'page', provider: 'ark', page: 2 });
+  assert.deepEqual(readModelPickerAction({ token: 'dsh:model:page:2', values: {} }), { kind: 'page', page: 2, provider: '' });
   assert.equal(readModelPickerAction({ token: 'dsh:answer:1' }), null);
   assert.equal(readModelPickerAction({ token: 'dsh:model:page:not-a-number' }), null);
   assert.equal(readModelPickerAction({}), null);
