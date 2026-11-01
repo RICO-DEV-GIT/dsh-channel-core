@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { schema } from '../config.js';
 import { card, createTransport } from '../transport.js';
 import { ConfigFile } from '../../../lib/channel-plugin-settings/file-config.js';
@@ -121,8 +121,9 @@ test('long reply without drafts reuses progress for first card, then sends remai
 });
 
 test('legacy boolean is read/normalized/saved/reloaded using the actual ConfigFile',()=>{
- const here=path.dirname(fileURLToPath(import.meta.url));
- const temp=path.resolve(here,'../../../cache/temp');
+ // Write into the OS temp directory, not into the repository: the old code created one
+ // cache/temp/feishu-progress-schema-* directory per run and left 100+ behind.
+ const temp=os.tmpdir();
  fs.mkdirSync(temp,{recursive:true});
  const directory=fs.mkdtempSync(path.join(temp,'feishu-progress-schema-'));
  const filename=path.join(directory,'config.json');
@@ -136,7 +137,7 @@ test('legacy boolean is read/normalized/saved/reloaded using the actual ConfigFi
   assert.equal(JSON.parse(fs.readFileSync(filename,'utf8')).streaming.mode,'progress');
   const reloaded=config.reload();
   assert.equal(reloaded.value.streaming.progress.maxLines,4);
- }finally{config.close();}
+ }finally{config.close();fs.rmSync(directory,{recursive:true,force:true});}
 });
 
 test('final Feishu presentation keeps collapsed draft card separate from answer card',async()=>{
