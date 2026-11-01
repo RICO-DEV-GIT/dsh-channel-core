@@ -397,17 +397,25 @@ export async function createTransport({config,credentials,signal,receive,state,d
       }
       try{
         const result=await host?.modelPicker?.({sessionId:record.sessionId,action:modelIntent});
-        // This SDK never sends a card-action response back (pushAction discards the handler's
-        // return value), so a tap can only change the card through the API. patchCard /
-        // updateCard is the single supported path here.
+        // A tap can change the card only through the API: this SDK discards card-action
+        // responses entirely. `im.v1.message.patch` answers 200 but the client keeps showing
+        // the old card (verified on the device: seven taps, seven "successful" patches, no
+        // visible change), so the reliable path is to post the new card and recall the old
+        // one. The operator sees one card, and it is always the current state.
         let outcome='无卡片变更';
         if(result?.card){
           try{
-            await channel.updateCard(event.messageId,result.card);
-            outcome='patch 成功';
+            const sent=await channel.send(event.chatId,{card:result.card},sendOptions({messageId:event.messageId,threadId:event.threadId}));
+            outcome='新卡已发送';
+            if(sent?.messageId){
+              modelCards.set(sent.messageId,{sessionId:record.sessionId});
+              if(modelCards.size>32)modelCards.delete(modelCards.keys().next().value);
+            }
+            try{await channel.recallMessage(event.messageId);outcome='新卡已发送，旧卡已撤回';}
+            catch{/* recall is best effort: the new card already carries the state */ }
           }catch(error){
             const code=error?.code??error?.status??error?.message??'未知';
-            outcome='patch 失败('+code+')';
+            outcome='发卡失败('+code+')';
             // No toast channel either: report with a real message so the operator sees it.
             try{
               await channel.send(event.chatId,{text:'卡片更新失败（'+code+'），请重新发送 /model。'},sendOptions({messageId:event.messageId,threadId:event.threadId}));

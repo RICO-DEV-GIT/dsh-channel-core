@@ -12,6 +12,7 @@ function fixture(host) {
     on(name, fn) { listeners.set(name, fn); return () => listeners.delete(name); },
     async send(chatId, body, options) { calls.push({ type: 'send', chatId, body, options }); return { messageId: 'card-' + calls.filter(c => c.type === 'send').length }; },
     async updateCard(id, payload) { calls.push({ type: 'update', id, payload }); },
+    async recallMessage(id) { calls.push({ type: 'recall', id }); },
     async connect() {}, async disconnect() {},
   };
   const sdk = { createLarkChannel: () => channel, Domain: { Lark: 'lark', Feishu: 'feishu' } };
@@ -39,7 +40,7 @@ test('a picker card is sent as an interactive card and remembered for taps', asy
   } finally { await t.close(); }
 });
 
-test('a tap re-renders the card for the Session the card belongs to', async () => {
+test('a tap posts the new card and recalls the old one', async () => {
   const seen = [];
   const f = fixture({
     modelPicker: async request => {
@@ -52,31 +53,36 @@ test('a tap re-renders the card for the Session the card belongs to', async () =
     await t.send(origin, { feishuModelCard: { card, sessionId: 'session-a' }, text: 'x', status: 'completed', final: true });
     await tapModel(f.listeners, { dsh_provider: 'ark', dsh_model: 'ark/model-x' });
     assert.deepEqual(seen, [{ sessionId: 'session-a', action: { kind: 'apply', provider: 'ark', model: 'ark/model-x' } }]);
-    // The SDK discards a card-action handler's return value, so the card must be updated
-    // through the API; returning it in the response never reached Feishu.
-    const update = f.calls.find(call => call.type === 'update');
-    assert.ok(update, 'the card is updated through the API');
-    assert.equal(update.id, 'card-1');
-    assert.deepEqual(update.payload, card);
+    // patching answered 200 but the client kept the old card, so a tap posts a fresh card
+    // and recalls the old one.
+    const cards = f.calls.filter(call => call.type === 'send' && call.body?.card);
+    assert.equal(cards.length, 2, 'original card + the new one');
+    assert.deepEqual(f.calls.find(call => call.type === 'recall'), { type: 'recall', id: 'card-1' });
   } finally { await t.close(); }
 });
 
-test('a page tap also updates the card through the API', async () => {
+test('a page tap posts the next page as a fresh card', async () => {
   const f = fixture({ modelPicker: async () => ({ card }) });
   const t = await f.create();
   try {
     await t.send(origin, { feishuModelCard: { card, sessionId: 'session-a' }, text: 'x', status: 'completed', final: true });
-    await tapModel(f.listeners, {}, 'dsh:model:apply', 'card-1', { dsh_model: '__dsh_page:2' });
-    const update = f.calls.find(call => call.type === 'update');
-    assert.ok(update, 'paging patches the card');
-    assert.equal(update.id, 'card-1');
+    await tapModel(f.listeners, {}, 'dsh:model:page:1', 'card-1');
+    const cards = f.calls.filter(call => call.type === 'send' && call.body?.card);
+    assert.equal(cards.length, 2, 'the new page is a new card');
+    assert.deepEqual(f.calls.find(call => call.type === 'recall'), { type: 'recall', id: 'card-1' });
   } finally { await t.close(); }
 });
 
-test('a failed patch reports through a message, not a toast', async () => {
+test('a failed send reports through a message, not a toast', async () => {
   const f = fixture({ modelPicker: async () => ({ card }) });
   const t = await f.create();
-  f.channel.updateCard = async () => { throw Object.assign(new Error('rejected'), { code: 230099 }); };
+  let sends = 0;
+  f.channel.send = async (chatId, body, options) => {
+    sends += 1;
+    if (sends === 2) throw Object.assign(new Error('rejected'), { code: 230099 });
+    f.calls.push({ type: 'send', chatId, body, options });
+    return { messageId: 'card-' + sends };
+  };
   try {
     await t.send(origin, { feishuModelCard: { card, sessionId: 'session-a' }, text: 'x', status: 'completed', final: true });
     await tapModel(f.listeners, { dsh_model: 'ark/model-x' }, 'dsh:model:apply', 'card-1');

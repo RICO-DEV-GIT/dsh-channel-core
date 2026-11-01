@@ -152,7 +152,10 @@ test('需求：首页没有上一页项，末页没有下一页项', () => {
 // ── 平台交互方式 ──────────────────────────────────────────────────────────
 test('平台：卡片更新走 API，不依赖回调响应（SDK 丢弃返回值）', () => {
   const transport = read('channels/feishu/transport.js');
-  assert.match(transport, /channel\.updateCard\(event\.messageId/, 'the card is patched through the API');
+  // Patching answered 200 without changing the card on the device, so the new state is
+  // posted as a fresh card and the old one is recalled.
+  assert.match(transport, /channel\.send\(event\.chatId,\{card:result\.card\}/, 'the new state is a fresh card');
+  assert.match(transport, /channel\.recallMessage\(event\.messageId\)/, 'the old card is recalled');
   assert.equal(/response\.card\s*=/.test(transport), false, 'no writing to a response nobody sends');
 });
 
