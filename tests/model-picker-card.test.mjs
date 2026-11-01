@@ -82,8 +82,12 @@ test('the pager buttons carry the page in their token', () => {
   const tokens = buttonsOf(middle).map(button => button.behaviors[0].value.dsh);
   assert.deepEqual(tokens, ['dsh:model:apply', 'dsh:model:page:0', 'dsh:model:page:2']);
   assert.deepEqual(readModelPickerAction({ token: 'dsh:model:page:2' }), { kind: 'page', page: 2, provider: '' });
-  assert.equal(readModelPickerAction({ token: 'dsh:model:page:-1' }), null);
-  assert.equal(readModelPickerAction({ token: 'dsh:model:page:x' }), null);
+});
+
+test('only digit-only page tokens are accepted', () => {
+  for (const token of ['dsh:model:page:-1', 'dsh:model:page:x', 'dsh:model:page:1.5', 'dsh:model:page:', 'dsh:model:page']) {
+    assert.equal(readModelPickerAction({ token }), null, token + ' must not be read as a page');
+  }
 });
 
 test('a switch lands on the page holding the chosen model', () => {
