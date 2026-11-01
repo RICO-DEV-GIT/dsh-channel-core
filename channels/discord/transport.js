@@ -68,7 +68,7 @@ export async function createTransport({config,credentials,signal,receive,state,d
         const catalog=await host.modelCatalog();
         if(interaction.commandName==='model'){await interaction.respond(modelChoices(catalog,query));return;}
         const sessionId=await sessionFor(interaction);
-        const selection=sessionId?currentSelection(catalog,await host.projections({sessionId})):undefined;
+        const selection=sessionId?currentSelection(catalog,await host.projections({sessionId},new AbortController().signal)):undefined;
         await interaction.respond(effortChoices(catalog,selection?.provider,selection?.model,query));return;
       }
       if(interaction.isChatInputCommand?.()&&(interaction.commandName==='model'||interaction.commandName==='think')){
@@ -82,14 +82,14 @@ export async function createTransport({config,credentials,signal,receive,state,d
             const chosen=decodeModel(interaction.options.getString('model'));
             if(!chosen){await ephemeral(interaction,'请从列表里选一个模型。');return;}
             const effort=defaultEffort(catalog,chosen.provider,chosen.model);
-            const result=await host.selectModel({sessionId,provider:chosen.provider,model:chosen.model,...(effort===undefined?{}:{reasoningEffort:effort})});
+            const result=await host.selectModel({sessionId,provider:chosen.provider,model:chosen.model,...(effort===undefined?{}:{reasoningEffort:effort})},new AbortController().signal);
             await ephemeral(interaction,'已切换模型：'+(result?.selected?describeSelection(catalog,result.selected):chosen.provider+'/'+chosen.model)+'\n从下一次请求开始生效。');return;
           }
-          const selection=currentSelection(catalog,await host.projections({sessionId}));
+          const selection=currentSelection(catalog,await host.projections({sessionId},new AbortController().signal));
           if(!selection?.provider||!selection?.model){await ephemeral(interaction,'还不知道当前模型，先用 /model 选一个。');return;}
           if(!effortChoices(catalog,selection.provider,selection.model).length){await ephemeral(interaction,'当前模型 '+selection.model+' 没有公布可选的推理强度。');return;}
           const effort=String(interaction.options.getString('effort'));
-          const result=await host.selectModel({sessionId,provider:selection.provider,model:selection.model,reasoningEffort:effort});
+          const result=await host.selectModel({sessionId,provider:selection.provider,model:selection.model,reasoningEffort:effort},new AbortController().signal);
           await ephemeral(interaction,'推理强度已更新：'+describeSelection(catalog,result?.selected??{...selection,reasoningEffort:effort})+'\n从下一次请求开始生效。');return;
         }catch(error){await ephemeral(interaction,failure(error));return;}
       }
